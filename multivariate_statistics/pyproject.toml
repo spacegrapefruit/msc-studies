@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "multivariate_statistics"
+version = "0.1.0"
+description = ""
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@euromonitor.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.3"
+numpy = "^2.1.2"
+pyreadstat = "^1.2.7"
+statsmodels = "^0.14.4"
+matplotlib = "^3.9.2"
+scikit-learn = "^1.5.2"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+nbconvert = "^7.16.4"
+pandoc = "^2.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

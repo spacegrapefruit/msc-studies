@@ -1,0 +1,50 @@
+`{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+`
+
+# Multivariate Analysis
+
+## Task 5
+
+```{r}
+library(foreign)
+library(psych)
+library(MASS)
+library(car)
+```
+
+```{r}
+data <- read.spss("~/studies/multivariate/data/hsb12.sav", to.data.frame = TRUE)
+```
+
+```{r}
+# 1.  (10 pt.)  File hsb12.sav.  Variables   
+# school= school’s id, 
+# student= student’s id
+# minority =1 if ethnical minority, 0 =  if not,  
+# female = 1 if female, 0 if male,
+# ses = social –economic status, 
+# cses = centered social-economic status,
+# meanses = school’s average ses
+# mathach= mathematical achievements, 
+# size = number of students at school,
+# sector =1 for catholic school, 0 for the state school, 
+# pracad = proportion of students in the academic track 
+# himinty =1 if  over 40% of students are from ethnical minorities, 0 if less than 40%.
+
+library(lme4)
+
+# create an unconditional multilevel model with MATHACH as the dependent variable and SCHOOL as the level 2 unit.
+data$SCHOOL_AND_STUDENT <- paste(data$SCHOOL, data$STUDENT %/% 2, sep = "_")
+model <- lmer(MATHACH ~ 1 + (1|SCHOOL_AND_STUDENT), data = data)
+
+summary(model)
+
+# residual variance
+residual_variance <- sigma(model)^2
+
+# group variance
+group_variance <- VarCorr(model)$SCHOOL[1]
+
+# intraclass correlation
+intraclass_correlation <- group_variance / (group_variance + residual_variance)
