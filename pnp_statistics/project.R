@@ -31,27 +31,3 @@ cat("Tau: ", tau, "p_1: ", p_1, "p_2: ", p_2, "\n")
 
 N_1 <- 10 * (2 + params$N)
 N_2 <- 100 * (2 + params$N)
-
-cdf_uniform <- function(theta, x) {
-  ifelse(x < theta[1], 0, ifelse(x > theta[2], 1, (x - theta[1]) / (theta[2] - theta[1])))
-}
-
-cdf_0 <- cdf_uniform(theta_0, seq(-50, 50, 0.1))
-# cdf_1 <- cdf_uniform(theta_1, seq(-50, 50, 0.1))
-# cdf_uniform(theta_0, seq(-50, 50, 0.1)) - cdf_uniform(theta_1, seq(-50, 50, 0.1))
-
-
-
-
-
-
-# # generate the uniformly distributed data
-# set.seed(123)
-# data_G0 <- runif(N_1, theta_0[1], theta_0[2])
-# data_G1 <- runif(N_1, theta_1[1], theta_1[2])
-# data_G2 <- runif(N_1, theta_2[1], theta_2[2])
-
-
-
-# kolmogorov-smirnov test
-# ks.test(

@@ -3,6 +3,7 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
 
 \title{Parametric \& Nonparametric Statistics Project}
 \author{Aleksandr Jan Smoliakov}
@@ -31,16 +32,16 @@ Let \(G_1, \ldots, G_m\) be given distribution functions and \(p_1, \ldots, p_m\
 \[
 G(u) := p_1 G_1(u) + \cdots + p_m G_m(u) = \sum_{k=1}^m p_k G_k(u), \quad u \in \mathbb{R}
 \]
-
 is called a mixture of distribution functions \(G_1, \ldots, G_m\) with probabilities (or weights) \(p_1, \ldots, p_m\).
 
 \(G\) is the distribution function of the random variable \(Z\) generated in the following way:
 
-1. Choose \(k \in \{1, \ldots, m\}\) at random with probabilities (or weights) \(p_1, \ldots, p_m\). The chosen number is denoted by \(k^*\).
+\begin{enumerate}
+    \item Choose \(k \in \{1, \ldots, m\}\) at random with probabilities (or weights) \(p_1, \ldots, p_m\). The chosen number is denoted by \(k^*\).
+    \item Generate a random variable \(Z^*_{k^*}\) according to the distribution function \(G_{k^*}\) and assign \(Z \leftarrow Z^*_{k^*}\).
+\end{enumerate}
 
-2. Generate a random variable \(Z^*_{k^*}\) according to the distribution function \(G_{k^*}\) and assign \(Z \leftarrow Z^*_{k^*}\).
-
-In this project, we will have \(m = 2\), so the algorithm for generating \(Z\) is as follows:
+In this task, we will have \(m = 2\), so the algorithm for generating \(Z\) is as follows:
 
 \[
 Z \leftarrow Z^*_{1+k^*} \quad k^* \sim \text{Binomial}(1, p_2), \quad Z^*_{k} \sim G_k \ (k = 1, 2).
@@ -48,26 +49,26 @@ Z \leftarrow Z^*_{1+k^*} \quad k^* \sim \text{Binomial}(1, p_2), \quad Z^*_{k} \
 
 Let
 \[
-\mathcal{G}(\Theta) = \{G(\cdot|\theta) : \theta \in \Theta\}
+\mathcal{G}(\Theta) = \{G(\cdot|\boldsymbol{\theta}), \boldsymbol{\theta} \in \Theta\}
 \]
 
-be a given parametric family of absolutely continuous parametric functions \(G(\cdot|\theta)\) with the respective distribution densities \(g(\cdot|\theta)\) dependent on the unknown parameter \(\theta \in \Theta\). It is assumed that \(\theta\) is two-dimensional, i.e., \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\).
+be a given parametric family of absolutely continuous parametric functions \(G(\cdot|\boldsymbol{\theta})\) with the respective distribution densities \(g(\cdot|\boldsymbol{\theta})\) dependent on the unknown parameter \(\boldsymbol{\theta} \in \Theta\). It is assumed that \(\boldsymbol{\theta}\) is two-dimensional, i.e., \(\boldsymbol{\theta} = (\theta_1, \theta_2) \in \mathbb{R}^2\).
 
 \subsection{Parametric Family Selection}
 
-Using the assigned formula $l := \left\lfloor \frac{I_2 + 2.5}{2} \right\rfloor$, we find $l = 5$. Thus, we will use the parametric family $\mathcal{G}_5(\Theta)$ in this project.
+Using the assigned formula \( \ell := \left\lfloor \frac{\mathcal{I}_2 + 2.5}{2} \right\rfloor \), we find \( \ell = 5 \). Thus, we will use the parametric family \(\mathcal{G}_5(\Theta)\) in this task.
 
 $\mathcal{G}_5(\Theta)$ contains distribution functions of random variables uniformly distributed on $[\theta_1, \theta_2]$, where $\theta_1 < \theta_2$.
 
-The family \( G_5(\Theta) \) consists of uniform distributions:
+It can be expressed as:
 \[
-G(u|\theta) = \begin{cases}
+G(u|\boldsymbol\theta) = \begin{cases}
 0 & u < \theta_1 \\
 \frac{u - \theta_1}{\theta_2 - \theta_1} & \theta_1 \le u \le \theta_2 \\
 1 & u > \theta_2
 \end{cases}
 \]
-with \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\) and \(\theta_1 < \theta_2\).
+with \(\boldsymbol\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\) and \(\theta_1 < \theta_2\).
 
 \section{Task 1: Testing Goodness-of-Fit}
 
@@ -75,16 +76,12 @@ with \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\) and \(\theta_1 < \theta_
 
 The problem gives a specific basic parameter:
 \[
-\theta_0 = (-\mathcal{N}, \mathcal{S} + 4) = (-9, 13).
-\]
-with \(\mathcal{N} = 9\) and \(\mathcal{S} = 9\). Thus:
-\[
-\theta_0 = (-9, 13).
+\boldsymbol\theta_0 = (-\mathcal{N}, \mathcal{S} + 4) = (-9, 13).
 \]
 
 Thus, the basic distribution function is:
 \[
-G_0(u) = G(u|\theta_0) = U(-9, 13).
+G_0(u) = \mathcal{G}_5(u|\boldsymbol\theta_0) = U(-9, 13).
 \]
 
 For a uniform distribution \(U(a,b)\):
@@ -104,59 +101,54 @@ For \(G_0 = U(-9, 13)\):
 v_0^2 = \frac{22^2}{12} = \frac{484}{12} = \frac{121}{3} \approx 40.3333
 \]
 
-So:
-\[
-\mu_0 = 2, \quad v_0^2 \approx 40.3333.
-\]
-
-\subsection{Finding \(G_1\) and \(G_2\)}
+\subsection{Finding Mixture Distributions}
 
 We are given the following equations for the mixture distributions \(G_1\) and \(G_2\):
 
-We have the equations:
+\[
+\mu_0 = \mu(\boldsymbol\theta_1), \quad \mathcal{N} v_0^2 = v^2(\boldsymbol\theta_1).
+\]
+
+\[
+\mu_0 + 2v_0 = \mu(\boldsymbol\theta_2), \quad v_0^2 = \mathcal{S} v^2(\boldsymbol\theta_2).
+\]
+
+\subsubsection{Determining \(G_1\)}
+
+First we determine \(G_1\). We have:
+
 \[
 \mu_0 = \mu(\theta_1), \quad \mathcal{N} v_0^2 = v^2(\theta_1).
 \]
 
+It is given that $\mu(\theta_1) = \mu_0 = 2$.
+
+Plugging in \(\mathcal{N} = 9\) and \(v_0^2 = \frac{121}{3} \), we get:
 \[
-\mu_0 + 2v_0 = \mu(\theta_2), \quad v_0^2 = \mathcal{S} v^2(\theta_2).
+v^2(\boldsymbol\theta_1) = \mathcal{N} v_0^2 = 9 \times \frac{121}{3} = 363.
 \]
 
-First we determine \(G_1\), we have:
-
+Let \(G_1(u) = U(a_1, b_1)\). For a uniform distribution:
 \[
-\mu_0 = \mu(\theta_1), \quad \mathcal{N} v_0^2 = v^2(\theta_1).
+\mu(\boldsymbol\theta_1) = \frac{a_1 + b_1}{2}, \quad v^2(\boldsymbol\theta_1) = \frac{(b_1 - a_1)^2}{12}.
 \]
 
-Since \(\mathcal{N} = 9\) and \(v_0^2 = \frac{121}{3} \), we have:
-\[
-v^2(\theta_1) = \mathcal{N} v_0^2 = 9 \times \frac{121}{3} = 363.
-\]
-
-Let \(G_1(u) = U(a_1,b_1)\). For a uniform distribution:
-\[
-\mu(\theta_1) = \frac{a_1 + b_1}{2}, \quad v^2(\theta_1) = \frac{(b_1 - a_1)^2}{12}.
-\]
-
-From \(\mu_0 = 2\):
+Since \(\mu(\boldsymbol\theta_1) = 2\):
 \[
 \frac{a_1 + b_1}{2} = 2 \implies a_1 + b_1 = 4.
 \]
 
-From \(N v_0^2 = v^2(\theta_1)\):
+Since \(v^2(\boldsymbol\theta_1) = 363\):
 \[
-\frac{(b_1 - a_1)^2}{12} = 363 \implies (b_1 - a_1)^2 = 4356.
-\]
-\[
-b_1 - a_1 = 66 \quad (\text{taking the positive root since } b_1 > a_1).
+\frac{(b_1 - a_1)^2}{12} = 363 \implies b_1 - a_1 = \sqrt{(b_1 - a_1)^2} = \sqrt{4356} = 66.
 \]
 
-Solve the system:
+Solving the system:
 \[
 a_1 + b_1 = 4, \quad b_1 - a_1 = 66.
 \]
 
-Add the two equations:
+Adding the two equations:
 \[
 2b_1 = 70 \implies b_1 = 35.
 \]
@@ -166,50 +158,55 @@ a_1 = 4 - 35 = -31.
 
 Thus:
 \[
-\theta_1 = (-31, 35) \implies G_1(u) = U(-31,35).
+\boldsymbol\theta_1 = (-31, 35) \implies G_1(u) = U(-31, 35).
 \]
 
----
+\subsubsection{Determining \(G_2\)}
 
-For \(G_2\):
+Repeating the process for \(G_2\). We have:
 
-First, compute \(v_0 = \sqrt{40.3333} \approx 6.349.\)
 \[
-\mu_0 + 2v_0 = 2 + 2 \times 6.349 = 2 + 12.698 = 14.698.
+\mu_0 + 2v_0 = \mu(\boldsymbol\theta_2), \quad v_0^2 = \mathcal{S} v^2(\boldsymbol\theta_2).
+\]
+
+Given \(\mu_0 = 2\) and \(v_0^2 = 40.3333\), we have:
+
+\[
+\mu(\boldsymbol\theta_2) = \mu_0 + 2v_0 = 2 + 2 \times \sqrt{40.3333} = 2 + 2 \times 6.3509 = 2 + 12.7018 = 14.7018.
 \]
 
 Also:
 \[
-v_0^2 = S v^2(\theta_2) \implies 40.3333 = 9 v^2(\theta_2) \implies v^2(\theta_2) = \frac{40.3333}{9} \approx 4.48148.
+v_0^2 = \mathcal{S} v^2(\boldsymbol\theta_2) \implies 40.3333 = 9 v^2(\boldsymbol\theta_2) \implies v^2(\boldsymbol\theta_2) = \frac{40.3333}{9} \approx 4.4815.
 \]
 
-For \(G_2(u) = U(a_2,b_2)\):
+For \(G_2(u) = U(a_2, b_2)\):
 \[
-\frac{a_2 + b_2}{2} = 14.698 \implies a_2 + b_2 = 29.396.
+\frac{a_2 + b_2}{2} = 14.7018 \implies a_2 + b_2 = 29.4036.
 \]
 \[
-\frac{(b_2 - a_2)^2}{12} = 4.48148 \implies (b_2 - a_2)^2 = 53.7777.
+\frac{(b_2 - a_2)^2}{12} = 4.4815 \implies (b_2 - a_2)^2 = 4.4815 \times 12 = 53.7777.
 \]
 \[
 b_2 - a_2 = \sqrt{53.7777} \approx 7.3333.
 \]
 
-Solve:
+Solving the system:
 \[
-a_2 + b_2 = 29.396, \quad b_2 - a_2 = 7.3333.
+a_2 + b_2 = 29.4036, \quad b_2 - a_2 = 7.3333.
 \]
 
-Add the two:
+Adding the two equations:
 \[
-2b_2 = 36.7293 \implies b_2 = 18.36465.
+2b_2 = 36.7369 \implies b_2 = 18.3685.
 \]
 \[
-a_2 = 29.396 - 18.36465 = 11.03135.
+a_2 = 29.4036 - 18.3685 = 11.0351.
 \]
 
 Thus:
 \[
-\theta_2 = (11.03135, 18.36465) \implies G_2(u) = U(11.03135,18.36465).
+\boldsymbol\theta_2 = (-11.0351, 18.3685) \implies G_2(u) = U(11.0351, 18.3685).
 \]
 
 \subsection{Computing \( p_1 \) and \( p_2 \)}
@@ -223,55 +220,45 @@ Given:
 \]
 
 \[
-p_1 = (\alpha_1)^{1-\tau} (\alpha_2)^\tau = (0.1)^{5/6} (0.01)^{1/6}.
-\]
-
-Compute approximately:
-- \(\alpha_1^{5/6} = 0.1^{0.8333...} = e^{0.8333 \ln(0.1)} \approx 0.146.\)
-- \(\alpha_2^{1/6} = 0.01^{1/6} = e^{(1/6)\ln(0.01)} \approx 0.464.\)
-
-Thus:
-\[
-p_1 \approx 0.146 \times 0.464 = 0.0677.
+p_1 = (\alpha_1)^{1-\tau} (\alpha_2)^\tau = (0.1)^{5/6} (0.01)^{1/6} \approx 0.06813.
 \]
 
 Then:
 \[
-p_2 = \frac{5 p_1}{\sqrt{S}} = \frac{5 \times 0.0677}{\sqrt{9}} = \frac{0.3385}{3} \approx 0.11283.
+p_2 = \frac{5 p_1}{\sqrt{S}} = \frac{5 \times 0.06813}{\sqrt{9}} = \frac{0.3406}{3} \approx 0.1135.
 \]
 
-\subsection{The Mixture Distributions for Testing}
+\subsection{Determining Mixture Distributions}
 
 We consider testing:
 \[
-H_0: F_Y = G_0.
-H': F_Y \neq G_0.
+H_0: F_Y = G_0 \textbf{ versus } H': F_Y \neq G_0
 \]
 
 We will compare the empirical distribution of samples generated from:
 
-1. \(F_Y = (1-p_1)G_0 + p_1 G_1\), i.e. a mixture of \(G_0\) and \(G_1\).
-2. \(F_Y = (1-p_2)G_0 + p_2 G_2\), i.e. a mixture of \(G_0\) and \(G_2\).
+\begin{enumerate}
+    \item \(F_Y = (1-p_1)G_0 + p_1 G_1\), i.e. a mixture of \(G_0\) and \(G_1\).
+    \item \(F_Y = (1-p_2)G_0 + p_2 G_2\), i.e. a mixture of \(G_0\) and \(G_2\).
+\end{enumerate}
 
 The tests are conducted for sample sizes:
 \[
-N_1 = 10 \times (2+\mathcal{N}) = 10 \times (2+9) = 10 \times 11 = 110,
+N_1 = 10 \times (2+\mathcal{N}) = 10 \times (2+9) = 110,
 \]
 \[
-n_2 = 100 \times (2+\mathcal{N}) = 100 \times 11 = 1100.
+N_2 = 100 \times (2+\mathcal{N}) = 100 \times (2+9) = 1100.
 \]
 
 \subsection{Goodness-of-Fit Tests}
 
-We use the Kolmogorov-Smirnov (KS) test for the given samples \((Y_t)_{t=1}^n\):
+We will use the Kolmogorov-Smirnov test for the given samples \((Y_t)_{t=1}^n\):
 
 The test statistic is:
 \[
-D_n = \sup_u |F_n(u) - G_0(u)|,
+D_n = \sup_u |F_n(u) - F(u)|,
 \]
-where \(F_n\) is the empirical distribution function (EDF) based on the sample.
-
-% As \(n \to \infty\), if \(F_Y \neq G_0\), the empirical distribution \(F_n\) converges to \(F_Y\), and thus \(D_n\) converges to \(\sup_u |F_Y(u)-G_0(u)|.\) For finite \(n\), the KS statistic will be around this difference plus sampling noise of order \(1/\sqrt{n}\).
+where \(F_n\) is the empirical distribution function (EDF) based on the sample and \(F\) is the theoretical distribution function. In this case, \(F = G_0\).
 
 Since:
 \[
@@ -283,16 +270,16 @@ F_Y(u) - G_0(u) = p_k [G_k(u) - G_0(u)],
 \]
 for \(k=1\) or \(k=2\).
 
-Thus, the maximum deviation from \(G_0\) is:
+Thus, the maximum difference between \(F_Y\) and \(G_0\) is:
 \[
 \sup_u |F_Y(u)-G_0(u)| = p_k \sup_u |G_k(u)-G_0(u)|.
 \]
 
-We need \(\sup_u |G_1(u)-G_0(u)|\) and \(\sup_u |G_2(u)-G_0(u)|.\)
+We need \(\sup_u |G_1(u)-G_0(u)|\) and \(\sup_u |G_2(u)-G_0(u)|\).
 
-\subsubsection{Case 1: \(G_1\) vs. \(G_0\)}
+\subsubsection{\(G_1\) vs. \(G_0\)}
 
-\(G_0 = U(-9,13)\), so:
+\(G_0 = U(-9, 13)\), so:
 \[
 G_0(u)=\begin{cases}
 0 & u < -9 \\
@@ -310,113 +297,131 @@ G_1(u)=\begin{cases}
 \end{cases}
 \]
 
-% To find \(\sup|G_1(u)-G_0(u)|\), we look where they overlap:
+To find \(\sup|G_1(u)-G_0(u)|\), we investigate ranges of \(u\) piecewise between the breakpoints of the two functions.
 
-% 1. For \(u < -9\):  
-%    \(G_0(u)=0\). If \(-31 \le u < -9\), \(G_1(u)=(u+31)/66\), which at \(u=-9\) is \(22/66=1/3\). As \(u\) approaches -9 from the left, \(G_1(u)-G_0(u)\) goes up to 1/3. For \(u<-31\), both are 0. So max difference before -9 is \(1/3=0.3333.\)
+\begin{enumerate}
+    \item For \(u < -31\): \(G_0(u) = G_1(u) = 0\), so the difference is 0.
+    \item For \(-31 \le u < -9\): \(G_0(u) = 0\), \(G_1(u) = \frac{u+31}{66}\). The difference is \(\frac{u+31}{66}\), which is increasing as \(u\) approaches -9, where it is \(\frac{-9 + 22}{66} = \frac{1}{3}\).
+    \item For \(-9 \le u < 13\): \(G_0(u) = \frac{u+9}{22}\), \(G_1(u) = \frac{u+31}{66}\). The difference is \(\frac{u+31}{66} - \frac{u+9}{22} = \frac{2u-4}{66}\), which is increasing from \(-\frac{1}{3}\) at -9 to \(\frac{1}{3}\) at 13.
+    \item For \(13 \le u < 35\): \(G_0(u) = 1\), \(G_1(u) = \frac{u+31}{66}\). The difference is \(\frac{u+31}{66} - 1 = \frac{u-35}{66}\), which is increasing from \(-\frac{1}{3}\) at 13 to 0 at 35.
+    \item For \(u \ge 35\): \(G_0(u) = G_1(u) = 1\), so the difference is 0.
+\end{enumerate}
 
-% 2. For \(-9 \le u \le 13\):  
-%    \(G_0(u)=(u+9)/22\), \(G_1(u)=(u+31)/66.\)  
-%    The difference:
-%    \[
-%    G_1(u)-G_0(u) = \frac{u+31}{66} - \frac{u+9}{22} = \frac{(u+31) - 3(u+9)}{66} = \frac{u+31-3u-27}{66} = \frac{-2u+4}{66}.
-%    \]
+The maximum absolute difference is \(\frac{1}{3}\) at the endpoints of the range \([-9,13]\).
 
-%    At \(u=-9\), difference = \((4+18)/66=22/66=1/3.\)  
-%    At \(u=13\), difference = \((4-26)/66=(-22)/66=-1/3.\)
+Hence:
+\[
+\sup_u|G_1(u)-G_0(u)| = 1/3 \approx 0.3333.
+\]
 
-%    The difference decreases linearly from 1/3 at u=-9 to -1/3 at u=13. The maximum absolute difference in this interval is still 1/3.
+For the mixture, taking \(p_1 \approx 0.06813\):
+\[
+\sup_u|F_Y(u)-G_0(u)| = p_1 \times 0.3333 = 0.06813 \times 0.3333 \approx 0.02271.
+\]
 
-% For \(u>13\), both distributions are at 1, difference=0.
+\subsubsection{\(G_2\) vs. \(G_0\)}
 
-% Hence:
-% \[
-% \sup_u|G_1(u)-G_0(u)| = 1/3 \approx 0.3333.
-% \]
+Repeating the process for \(G_2\):
 
-% Then for the mixture:
-% \[
-% \sup_u|F_Y(u)-G_0(u)| = p_1 \times 0.3333.
-% \]
+\(G_0 = U(-9, 13)\), so:
+\[
+G_0(u)=\begin{cases}
+0 & u < -9 \\
+\frac{u+9}{22} & -9 \le u \le 13 \\
+1 & u > 13
+\end{cases}
+\]
 
-% With \(p_1 \approx 0.0677\):
-% \[
-% \sup_u|F_Y(u)-G_0(u)| \approx 0.0677 \times 0.3333 = 0.0226.
-% \]
+\(G_2 = U(11.0351, 18.3685)\), so:
+\[
+G_2(u)=\begin{cases}
+0 & u < 11.0351 \\
+\frac{u-11.0351}{7.3333} & 11.0351 \le u \le 18.3685 \\
+1 & u > 18.3685
+\end{cases}
+\]
 
-\subsubsection{Case 2: \(G_2\) vs. \(G_0\)}
+To find \(\sup|G_2(u)-G_0(u)|\), we investigate ranges of \(u\) piecewise between the breakpoints of the two functions.
 
-% - \(G_2 = U(11.03135, 18.36465)\).
+\begin{enumerate}
+    \item For \(u < -9\): \(G_0(u) = G_2(u) = 0\), so the difference is 0.
+    \item For \(-9 \le u < 11.0351\): \(G_0(u) = \frac{u+9}{22}\), \(G_2(u) = 0\). The difference is \(\frac{u+9}{22}\), which is increasing as \(u\) approaches 11.0351, where it is \(\frac{11.0351 + 9}{22} \approx 0.9107\).
+    \item For \(11.0351 \le u < 13\): \(G_0(u) = \frac{u+9}{22}\), \(G_2(u) = \frac{u-11.0351}{7.3333}\). The difference is \(\frac{u-11.0351}{7.3333} - \frac{u+9}{22} = \frac{3u-33.1053}{22} - \frac{u+9}{22} = \frac{2u-42.1053}{22}\), which is increasing from -0.9107 at 11.0351 to \(\frac{13-42.1053}{22} \approx -0.7321\) at 13.
+    \item For \(13 \le u < 18.3685\): \(G_0(u) = 1\), \(G_2(u) = \frac{u-11.0351}{7.3333}\). The difference is \(\frac{u-11.0351}{7.3333} - 1 = \frac{u-18.3685}{7.3333}\), which is increasing from \(-\frac{18.3685 - 13}{7.3333} = -\frac{5.3685}{7.3333} \approx -0.7321\) at 13 to 0 at 18.3685.
+    \item For \(u \ge 18.3685\): \(G_0(u) = G_2(u) = 1\), so the difference is 0.
+\end{enumerate}
 
-% For \(G_0(u)\):
-% - On \([-9,13]\), \(G_0(u)=(u+9)/22\).
+The maximum absolute difference is \(\approx 0.9107\) at 11.0351.
 
-% Compare with \(G_2(u)\):
-% - For \(u < 11.03135\), \(G_2(u)=0\).  
-%   At \(u=11.03135\), \(G_0(11.03135) \approx (20.03135)/22 \approx0.9105.\)  
-%   Difference just before \(11.03135\) is about \(0 - 0.9105 = -0.9105.\) This is very large in absolute value.
+Hence:
+\[
+\sup_u|G_2(u)-G_0(u)| \approx 0.9107.
+\]
 
-% - As \(u\) moves from 11.03135 to 18.36465, \(G_2(u)\) increases from 0 to 1 linearly. Eventually, at \(u=18.36465\), both are 1. The largest absolute difference occurs near \(u=11.03135\), about 0.9105.
+For the mixture, taking \(p_2 \approx 0.1135\):
+\[
+\sup_u|F_Y(u)-G_0(u)| = p_2 \times 0.9107 = 0.1135 \times 0.9107 \approx 0.1034.
+\]
 
-% Thus:
-% \[
-% \sup_u|G_2(u)-G_0(u)| \approx 0.9105.
-% \]
+\subsection{Critical Values and Detection Probability}
 
-% For the mixture:
-% \[
-% \sup_u|F_Y(u)-G_0(u)| = p_2 \times 0.9105 = 0.11283 \times 0.9105 \approx 0.1027.
-% \]
+Under \(H_0\), the Kolmogorov-Smirnov test critical values at significance \(\alpha_1=0.1\) for sample sizes \(n=110\) and \(\alpha_2=0.01\) for \(n=1100\) are approximately:
+\[
+D_{N,\alpha} \approx \frac{1.22}{\sqrt{N}} \quad \text{for} \quad \alpha=0.1,
+\]
+\[
+D_{N,\alpha} \approx \frac{1.63}{\sqrt{N}} \quad \text{for} \quad \alpha=0.01.
+\]
 
-\subsection{KS Test Critical Values and Detection Probability}
+For \(N=110\):
+\[
+D_{110,0.1} \approx \frac{1.22}{\sqrt{110}} \approx 0.1163 \quad \text{and} \quad D_{110,0.01} \approx \frac{1.63}{\sqrt{110}} \approx 0.1554.
+\]
 
-% Under \(H_0\), the KS test critical values at significance \(\alpha=0.05\) are approximately:
-% \[
-% D_{n,\alpha} \approx \frac{1.36}{\sqrt{n}}.
-% \]
+\begin{itemize}
+    \item For \(G_1\): \(\sup|F_Y-G_0|\approx 0.02271 < 0.1163 < 0.1554\). Thus, at \(N=110\), it's unlikely we reject \(H_0\). \(p > 0.1\)
+    \item For \(G_2\): \(\sup|F_Y-G_0|\approx 0.1034 < 0.1163 < 0.1554\). There is some chance to reject at a higher \(\alpha\) level. \(p > 0.1\) (but it's closer to the borderline)
+\end{itemize}
 
-% 1. For \(n=110\):
-% \[
-% D_{110,0.05} \approx \frac{1.36}{\sqrt{110}} \approx \frac{1.36}{10.488} \approx 0.1297.
-% \]
+For \(N=1100\):
+\[
+D_{1100,0.1} \approx \frac{1.22}{\sqrt{1100}} \approx 0.03678 \quad \text{and} \quad D_{1100,0.01} \approx \frac{1.63}{\sqrt{1100}} \approx 0.04915.
+\]
 
-% - For the \(G_1\)-mixture: \(\sup|F_Y-G_0|\approx 0.0226\). This "signal" is much smaller than 0.1297. Thus, at \(n=110\), it's unlikely we reject \(H_0\). The p-value would be large (not close to 0.05).
+\begin{itemize}
+    \item For \(G_1\): \(\sup|F_Y-G_0|\approx 0.02271 < 0.03678 < 0.04915\). Even with 1100 samples, we will likely not reject \(H_0\) at \(\alpha=0.1\). \(p > 0.1\)
+    \item For \(G_2\): \(\sup|F_Y-G_0|\approx 0.03678 < 0.04915 < 0.1034\). We will almost certainly reject \(H_0\) at \(\alpha=0.01\). \(p < 0.01\)
+\end{itemize}
 
-% - For the \(G_2\)-mixture: \(\sup|F_Y-G_0|\approx 0.1027\), which is still less than 0.1297, but closer. There is a moderate chance to reject at a higher \(\alpha\) level, but at \(\alpha=0.05\) it's borderline. The p-value might be around 0.1–0.2.
+Thus, the results of the Kolmogorov-Smirnov test are as follows:
 
-% 2. For \(n=1100\):
-% \[
-% D_{1100,0.05} \approx \frac{1.36}{\sqrt{1100}} \approx \frac{1.36}{33.166} \approx 0.041.
-% \]
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Mixture} & \textbf{Sample Size} & \textbf{p-value} & \textbf{Result} \\ \hline
+\(G_1\) & 110 & \(>0.1\) & No rejection \\ \hline
+\(G_1\) & 1100 & \(>0.1\) & No rejection \\ \hline
+\(G_2\) & 110 & \(>0.1\) & No rejection \\ \hline
+\(G_2\) & 1100 & \(<0.01\) & Rejection at \(\alpha=0.01\) \\ \hline
+\end{tabular}
+\end{table}
 
-% - For the \(G_1\)-mixture: \(\sup|F_Y-G_0|\approx 0.0226\), which is still less than 0.041. Even with a large sample, the difference is too small. Likely no rejection at \(\alpha=0.05.\)
+\subsection{Conclusions}
 
-% - For the \(G_2\)-mixture: \(\sup|F_Y-G_0|\approx 0.1027\) is now much larger than 0.041. This is a substantial difference. With \(n=1100\), the KS test will almost certainly reject \(H_0\) at \(\alpha=0.05\) (and even at much lower \(\alpha\)).
+By analytically comparing the theoretical distributions, we have:
 
-\subsection{Approximate p-values}
+\begin{itemize}
+    \item \textbf{Mixture with \(G_1\):}\\
+    \(\sup|F_Y-G_0|\approx 0.02271\).\\  
+    Even at \(N=1100\), we will likely not reject \(H_0\) at \(\alpha=0.1\). The p-value is higher than 0.1.
+    \item \textbf{Mixture with \(G_2\):}\\
+    \(\sup|F_Y-G_0|\approx 0.1034\).\\
+    We will almost certainly reject \(H_0\) at \(\alpha=0.01\) even with 1100 samples. The p-value is \(<0.01\). We will likely not reject with 110 samples at \(\alpha=0.1\), but the p-value may be close.
+\end{itemize}
 
-% - **For the \(G_1\)-mixture:**
-%   The inherent difference (0.0226) is about a quarter to half of the typical KS fluctuation at \(n=1100\) and even smaller compared to the fluctuation at \(n=110\). The p-value is therefore large, and the test has low power to detect this small mixture. You will not reject \(H_0\) at standard significance levels for either \(n=110\) or \(n=1100\).
+It is evident that for Kolmogorov-Smirnov tests, the magnitude of the deviation from \(G_0\) and the sample size play the decisive role.
 
-% - **For the \(G_2\)-mixture with \(n=110\):**
-%   The difference (0.1027) is about 0.79 times the 5% critical value (0.1297). This might lead to a p-value somewhat greater than 0.05, perhaps around 0.1–0.2. It's borderline; you might not reject at \(\alpha=0.05\).
-
-% - **For the \(G_2\)-mixture with \(n=1100\):**
-%   The difference (0.1027) is more than double the 5% critical value (0.041). The p-value will be extremely small (<0.001). You will definitely reject \(H_0\).
-
-\subsection{Conclusion}
-
-% By analytically comparing the theoretical distributions, we have:
-
-% - **Mixture with \(G_1\)**:  
-%   \(\sup|F_Y-G_0|\approx 0.0226.\)  
-%   Even at \(n=1100\), the KS critical value for \(\alpha=0.05\) is about 0.041, which is larger than 0.0226. Hence, the KS test will not reject \(H_0\) at common significance levels. The p-value is relatively large.
-
-% - **Mixture with \(G_2\)**:  
-%   \(\sup|F_Y-G_0|\approx 0.1027.\)  
-%   For \(n=110\), this difference is close but still smaller than the 5% critical value of about 0.1297, so likely no rejection at \(\alpha=0.05\), but the p-value may not be very large (still possibly >0.05).  
-%   For \(n=1100\), the difference (0.1027) far exceeds the 5% critical value (0.041). This means a very small p-value and a definite rejection of \(H_0\).
-
-% Thus, analytically, the KS test can detect the mixture with \(G_2\) at a large sample size easily, but struggles with \(G_1\) even for a large sample. No empirical simulation is needed to see that the magnitude of the deviation from \(G_0\) plays the decisive role.
+As \(N \to \infty\), if \(F_Y \neq G_0\), the empirical distribution \(F_N\) converges to \(F_Y\), and thus \(D_N\) converges to \(\sup_u |F_Y(u)-G_0(u)|\).
 
 \end{document}
