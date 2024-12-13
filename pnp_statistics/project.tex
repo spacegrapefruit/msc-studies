@@ -12,29 +12,52 @@
 
 \maketitle
 
+\section{Introduction}
+
+
+
 \section{Preliminaries}
 
-We are given the following parameters:
+In the project below, we will use the following parameters:
 \begin{itemize}
-    \item $N = 9$
-    \item $S = 9$
-    \item $I_1 = 5$
-    \item $I_2 = 8$
+    \item $\mathcal{N} = 9$ (first name: `Aleksandr', 9 letters)
+    \item $\mathcal{S} = 9$ (last name: `Smoliakov', 9 letters)
+    \item $\mathcal{I}_1 = 5$ (last digit of study book number)
+    \item $\mathcal{I}_2 = 8$ (second last digit of study book number)
 \end{itemize}
 
-% Let $G_1, \ldots, G_m$ be given distribution functions and $p_1, \ldots, p_m$ be probabilities that sum to 1. The distribution function $G$ defined by
-% \[
-% G(u) := p_1 G_1(u) + \cdots + p_m G_m(u) = \sum_{k=1}^m p_k G_k(u), \quad u \in \mathbb{R}
-% \]
-% is called a mixture of distribution functions $G_1, \ldots, G_m$ with probabilities (or weights) $p_1, \ldots, p_m$.
+Let \(G_1, \ldots, G_m\) be given distribution functions and \(p_1, \ldots, p_m\) be probabilities that sum to 1. The distribution function \(G\) defined by
 
-\section{Task 1: Testing Goodness-of-Fit}
+\[
+G(u) := p_1 G_1(u) + \cdots + p_m G_m(u) = \sum_{k=1}^m p_k G_k(u), \quad u \in \mathbb{R}
+\]
+
+is called a mixture of distribution functions \(G_1, \ldots, G_m\) with probabilities (or weights) \(p_1, \ldots, p_m\).
+
+\(G\) is the distribution function of the random variable \(Z\) generated in the following way:
+
+1. Choose \(k \in \{1, \ldots, m\}\) at random with probabilities (or weights) \(p_1, \ldots, p_m\). The chosen number is denoted by \(k^*\).
+
+2. Generate a random variable \(Z^*_{k^*}\) according to the distribution function \(G_{k^*}\) and assign \(Z \leftarrow Z^*_{k^*}\).
+
+In this project, we will have \(m = 2\), so the algorithm for generating \(Z\) is as follows:
+
+\[
+Z \leftarrow Z^*_{1+k^*} \quad k^* \sim \text{Binomial}(1, p_2), \quad Z^*_{k} \sim G_k \ (k = 1, 2).
+\]
+
+Let
+\[
+\mathcal{G}(\Theta) = \{G(\cdot|\theta) : \theta \in \Theta\}
+\]
+
+be a given parametric family of absolutely continuous parametric functions \(G(\cdot|\theta)\) with the respective distribution densities \(g(\cdot|\theta)\) dependent on the unknown parameter \(\theta \in \Theta\). It is assumed that \(\theta\) is two-dimensional, i.e., \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\).
 
 \subsection{Parametric Family Selection}
 
-Using the assigned formula $l := \left\lfloor \frac{I_2 + 2.5}{2} \right\rfloor$, we find $l = 5$. Thus, we will use the parametric family $G_5(\Theta)$ in this project.
+Using the assigned formula $l := \left\lfloor \frac{I_2 + 2.5}{2} \right\rfloor$, we find $l = 5$. Thus, we will use the parametric family $\mathcal{G}_5(\Theta)$ in this project.
 
-We are given the parametric distribution family $G_5(\Theta)$, which contains distribution functions of random variables uniformly distributed on $[\theta_1, \theta_2]$, $\theta_1 < \theta_2$.
+$\mathcal{G}_5(\Theta)$ contains distribution functions of random variables uniformly distributed on $[\theta_1, \theta_2]$, where $\theta_1 < \theta_2$.
 
 The family \( G_5(\Theta) \) consists of uniform distributions:
 \[
@@ -44,52 +67,70 @@ G(u|\theta) = \begin{cases}
 1 & u > \theta_2
 \end{cases}
 \]
-with \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\) and \(\theta_1 < \theta_2.\)
+with \(\theta = (\theta_1, \theta_2) \in \mathbb{R}^2\) and \(\theta_1 < \theta_2\).
+
+\section{Task 1: Testing Goodness-of-Fit}
 
 \subsection{Basic Distribution Function}
 
-The parameter of the basic distribution function $G_0$ is $\theta_0 = (-N, S + 4) = (-9, 13)$.
-
 The problem gives a specific basic parameter:
 \[
-\theta_0 = (-N, S + 4),
+\theta_0 = (-\mathcal{N}, \mathcal{S} + 4) = (-9, 13).
 \]
-with \(N = 9\) and \(S = 9\). Thus:
+with \(\mathcal{N} = 9\) and \(\mathcal{S} = 9\). Thus:
 \[
 \theta_0 = (-9, 13).
 \]
 
-So:
+Thus, the basic distribution function is:
 \[
 G_0(u) = G(u|\theta_0) = U(-9, 13).
 \]
 
 For a uniform distribution \(U(a,b)\):
-- Mean: \(\mu = \frac{a+b}{2}\)
-- Variance: \(v^2 = \frac{(b-a)^2}{12}\)
+
+\begin{itemize}
+    \item Mean: \(\mu = \frac{a+b}{2}\)
+    \item Variance: \(v^2 = \frac{(b-a)^2}{12}\)
+\end{itemize}
 
 For \(G_0 = U(-9, 13)\):
-- \(\mu_0 = \frac{-9 + 13}{2} = \frac{4}{2} = 2.\)
-- \((b_0 - a_0) = 13 - (-9) = 22.\)
-- \(v_0^2 = \frac{22^2}{12} = \frac{484}{12} = 40.3333...\)
+
+\[
+\mu_0 = \frac{-9 + 13}{2} = \frac{4}{2} = 2
+\]
+
+\[
+v_0^2 = \frac{22^2}{12} = \frac{484}{12} = \frac{121}{3} \approx 40.3333
+\]
 
 So:
 \[
 \mu_0 = 2, \quad v_0^2 \approx 40.3333.
 \]
 
-\subsection{Finding \(\theta_1\) and \(\theta_2\)}
+\subsection{Finding \(G_1\) and \(G_2\)}
 
-For \(G_1 \):
+We are given the following equations for the mixture distributions \(G_1\) and \(G_2\):
 
 We have the equations:
 \[
-\mu_0 = \mu(\theta_1), \quad N v_0^2 = v^2(\theta_1).
+\mu_0 = \mu(\theta_1), \quad \mathcal{N} v_0^2 = v^2(\theta_1).
 \]
 
-Since \(N = 9\) and \(v_0^2 \approx 40.3333\):
 \[
-N v_0^2 = 9 \times 40.3333 = 362.9997 \approx 363.
+\mu_0 + 2v_0 = \mu(\theta_2), \quad v_0^2 = \mathcal{S} v^2(\theta_2).
+\]
+
+First we determine \(G_1\), we have:
+
+\[
+\mu_0 = \mu(\theta_1), \quad \mathcal{N} v_0^2 = v^2(\theta_1).
+\]
+
+Since \(\mathcal{N} = 9\) and \(v_0^2 = \frac{121}{3} \), we have:
+\[
+v^2(\theta_1) = \mathcal{N} v_0^2 = 9 \times \frac{121}{3} = 363.
 \]
 
 Let \(G_1(u) = U(a_1,b_1)\). For a uniform distribution:
@@ -128,17 +169,9 @@ Thus:
 \theta_1 = (-31, 35) \implies G_1(u) = U(-31,35).
 \]
 
-Check variance:
-\[
-(b_1 - a_1)^2/12 = 66^2/12 = 4356/12 = 363 \, \checkmark
-\]
+---
 
-For \(G_2 \):
-
-We have:
-\[
-\mu_0 + 2v_0 = \mu(\theta_2), \quad v_0^2 = S v^2(\theta_2).
-\]
+For \(G_2\):
 
 First, compute \(v_0 = \sqrt{40.3333} \approx 6.349.\)
 \[
@@ -207,13 +240,12 @@ Then:
 p_2 = \frac{5 p_1}{\sqrt{S}} = \frac{5 \times 0.0677}{\sqrt{9}} = \frac{0.3385}{3} \approx 0.11283.
 \]
 
----
-
 \subsection{The Mixture Distributions for Testing}
 
 We consider testing:
 \[
 H_0: F_Y = G_0.
+H': F_Y \neq G_0.
 \]
 
 We will compare the empirical distribution of samples generated from:
@@ -223,98 +255,168 @@ We will compare the empirical distribution of samples generated from:
 
 The tests are conducted for sample sizes:
 \[
-n_1 = 10 \times (2+N) = 10 \times (2+9) = 10 \times 11 = 110,
+N_1 = 10 \times (2+\mathcal{N}) = 10 \times (2+9) = 10 \times 11 = 110,
 \]
 \[
-n_2 = 100 \times (2+N) = 100 \times 11 = 1100.
+n_2 = 100 \times (2+\mathcal{N}) = 100 \times 11 = 1100.
 \]
 
-\subsection{Goodness-of-Fit Tests and DKW Inequality}
+\subsection{Goodness-of-Fit Tests}
 
-We use the following tests for the given samples \((Y_t)_{t=1}^n\):
+We use the Kolmogorov-Smirnov (KS) test for the given samples \((Y_t)_{t=1}^n\):
 
-1. **Kolmogorov–Smirnov (KS) Test**:  
-   Test statistic:
-   \[
-   D_n = \sup_u |F_n(u) - G_0(u)|,
-   \]
-   where \(F_n\) is the empirical distribution function (EDF) based on the sample.
+The test statistic is:
+\[
+D_n = \sup_u |F_n(u) - G_0(u)|,
+\]
+where \(F_n\) is the empirical distribution function (EDF) based on the sample.
 
-2. **Cramér–von Mises (CvM) Test**:  
-   Test statistic:
-   \[
-   W^2 = \int_{-\infty}^{\infty} [F_n(u)-G_0(u)]^2 dG_0(u).
-   \]
+% As \(n \to \infty\), if \(F_Y \neq G_0\), the empirical distribution \(F_n\) converges to \(F_Y\), and thus \(D_n\) converges to \(\sup_u |F_Y(u)-G_0(u)|.\) For finite \(n\), the KS statistic will be around this difference plus sampling noise of order \(1/\sqrt{n}\).
 
-3. **Anderson–Darling (AD) Test**:  
-   A weighted version of CvM that puts more emphasis on the tails:
-   \[
-   A^2 = \int_{-\infty}^{\infty} \frac{[F_n(u)-G_0(u)]^2}{G_0(u)(1-G_0(u))} dG_0(u).
-   \]
+Since:
+\[
+F_Y(u) = (1 - p_k) G_0(u) + p_k G_k(u),
+\]
+we have:
+\[
+F_Y(u) - G_0(u) = p_k [G_k(u) - G_0(u)],
+\]
+for \(k=1\) or \(k=2\).
 
-4. **Dvoretzky–Kiefer–Wolfowitz (DKW) Inequality**:  
-   Provides uniform confidence bands for the EDF around the true CDF:
-   \[
-   P\left(\sup_u |F_n(u)-F(u)| > \varepsilon\right) \le 2e^{-2n\varepsilon^2}.
-   \]
-   This can be used to derive a test or confidence envelope.
+Thus, the maximum deviation from \(G_0\) is:
+\[
+\sup_u |F_Y(u)-G_0(u)| = p_k \sup_u |G_k(u)-G_0(u)|.
+\]
 
-For each test, we compare the observed test statistic against the critical values or use a Monte Carlo approach to determine p-values.
+We need \(\sup_u |G_1(u)-G_0(u)|\) and \(\sup_u |G_2(u)-G_0(u)|.\)
 
-\subsection{Finding p-values and Commenting on Results}
+\subsubsection{Case 1: \(G_1\) vs. \(G_0\)}
 
-Since the problem states that we should find (approximate) p-values and comment on the results, the final step will outline how to conduct these tests in principle. Exact numeric p-values require simulation or tables, as no closed-form solutions are provided here. However, we will give a detailed approach to obtaining those p-values and compare the tests.
+\(G_0 = U(-9,13)\), so:
+\[
+G_0(u)=\begin{cases}
+0 & u < -9 \\
+\frac{u+9}{22} & -9 \le u \le 13 \\
+1 & u > 13
+\end{cases}
+\]
 
-**Approach to Finding p-values:**
+\(G_1 = U(-31,35)\), so:
+\[
+G_1(u)=\begin{cases}
+0 & u < -31 \\
+\frac{u+31}{66} & -31 \le u \le 35 \\
+1 & u > 35
+\end{cases}
+\]
 
-1. **Monte Carlo Simulation (Recommended Method)**:
-   - Under \(H_0\): Generate a large number of samples from \(G_0 = U(-9,13)\).
-   - For each sample, compute the test statistic (KS, CvM, AD).
-   - Determine the distribution of the test statistic under \(H_0\).
-   - Now, take the observed data:
-     - If data is generated from \((1-p_1)G_0 + p_1 G_1\) or \((1-p_2)G_0 + p_2 G_2\), compute the test statistic for this observed sample.
-   - The p-value is the proportion of simulated \(H_0\)-samples whose test statistic exceeds the observed one.
+% To find \(\sup|G_1(u)-G_0(u)|\), we look where they overlap:
 
-2. **Comparison of Tests**:
-   - **KS test**: Sensitive to the largest deviation anywhere in the distribution, but not as sensitive to tail differences.
-   - **CvM test**: A more balanced measure of differences across the entire distribution.
-   - **AD test**: More sensitive to differences in the tails, which may be crucial if the alternative distributions differ significantly from \(G_0\) in their spread or tail behavior.
-   
-   Since \(G_1\) has the same mean but a much larger variance than \(G_0\), the tails are more "spread out." We expect the AD test to detect this difference more readily than KS, especially for large sample sizes. The CvM test should also show good power against a spread difference.  
-   
-   For \(G_2\), the mean is shifted substantially (\(\mu_2 \approx 14.698\) vs. \(\mu_0 = 2\)). All tests (KS, CvM, AD) should easily detect this difference, especially for large \(n\).
+% 1. For \(u < -9\):  
+%    \(G_0(u)=0\). If \(-31 \le u < -9\), \(G_1(u)=(u+31)/66\), which at \(u=-9\) is \(22/66=1/3\). As \(u\) approaches -9 from the left, \(G_1(u)-G_0(u)\) goes up to 1/3. For \(u<-31\), both are 0. So max difference before -9 is \(1/3=0.3333.\)
 
-3. **Effect of Sample Size**:
-   - For \(n=110\): With a moderate sample size, subtle differences might not be so easily detected. Small mixture probability \(p_1\) might lead to a moderate p-value for the test with \(G_1\).
-   - For \(n=1100\): With a large sample, even small deviations from \(G_0\) become evident. Expect very small p-values (strong rejection of \(H_0\)) for both mixtures, especially the one with \(G_2\).
+% 2. For \(-9 \le u \le 13\):  
+%    \(G_0(u)=(u+9)/22\), \(G_1(u)=(u+31)/66.\)  
+%    The difference:
+%    \[
+%    G_1(u)-G_0(u) = \frac{u+31}{66} - \frac{u+9}{22} = \frac{(u+31) - 3(u+9)}{66} = \frac{u+31-3u-27}{66} = \frac{-2u+4}{66}.
+%    \]
 
-4. **Approximate p-values**:
-   Without actual data simulation, we can only state qualitatively:
-   - For the mixture with \(G_1\):
-     - At \(n=110\): p-values might be moderate; the KS test may still not strongly reject \(H_0\), but CvM and AD tests may yield smaller p-values due to their sensitivity to variance differences.
-     - At \(n=1100\): p-values likely become very small, indicating strong evidence against \(H_0\).
+%    At \(u=-9\), difference = \((4+18)/66=22/66=1/3.\)  
+%    At \(u=13\), difference = \((4-26)/66=(-22)/66=-1/3.\)
 
-   - For the mixture with \(G_2\):
-     - Even at \(n=110\), the large shift in mean should lead to very low p-values for all tests, likely rejecting \(H_0\).
-     - At \(n=1100\), the difference is even more stark, and the p-values should be extremely small.
+%    The difference decreases linearly from 1/3 at u=-9 to -1/3 at u=13. The maximum absolute difference in this interval is still 1/3.
 
-\subsection{Conclusion and Comments}
+% For \(u>13\), both distributions are at 1, difference=0.
 
-- The **Anderson–Darling test** often outperforms KS and CvM in detecting differences in the tails. Since \(G_1\) differs in spread, AD might provide the smallest p-values.
-- The **Cramér–von Mises test** is a good all-rounder and might also show lower p-values than KS for the \(G_1\) mixture scenario.
-- The **Kolmogorov–Smirnov test**, while classic and widely used, can be less sensitive to certain types of distributional differences, especially when differences are not concentrated in one part of the distribution.
-- The **Dvoretzky–Kiefer–Wolfowitz inequality** provides a theoretical bound on deviations, ensuring that for large sample sizes the observed deviations are highly unlikely, thus leading to small p-values.
+% Hence:
+% \[
+% \sup_u|G_1(u)-G_0(u)| = 1/3 \approx 0.3333.
+% \]
 
-For the given mixtures:
-- With \(F_Y = (1-p_1)G_0 + p_1 G_1\) and a moderate sample size \(n=110\), the p-values might be around a borderline region, depending on the exact realization. Increasing to \(n=1100\) makes detecting the difference almost certain.
-- With \(F_Y = (1-p_2)G_0 + p_2 G_2\), the shift in the mean is large, and all tests should yield very small p-values, even at \(n=110\), strongly rejecting \(H_0\).
+% Then for the mixture:
+% \[
+% \sup_u|F_Y(u)-G_0(u)| = p_1 \times 0.3333.
+% \]
 
-In summary, for the given alternatives, all tests will eventually show that the data does not come from \(G_0\), but their sensitivity and the required sample size to confidently reject \(H_0\) differ. The Anderson–Darling test tends to be the most sensitive in these scenarios, providing the smallest p-values, followed by Cramér–von Mises, and then Kolmogorov–Smirnov. Larger sample sizes drastically reduce p-values for both mixtures.
+% With \(p_1 \approx 0.0677\):
+% \[
+% \sup_u|F_Y(u)-G_0(u)| \approx 0.0677 \times 0.3333 = 0.0226.
+% \]
 
----
+\subsubsection{Case 2: \(G_2\) vs. \(G_0\)}
 
-**Final Note**: The exact numerical p-values require either:
-- Simulation: Generating samples under \(H_0\) and under the specified alternatives, or
-- Using published tables/approximations for these tests.
+% - \(G_2 = U(11.03135, 18.36465)\).
+
+% For \(G_0(u)\):
+% - On \([-9,13]\), \(G_0(u)=(u+9)/22\).
+
+% Compare with \(G_2(u)\):
+% - For \(u < 11.03135\), \(G_2(u)=0\).  
+%   At \(u=11.03135\), \(G_0(11.03135) \approx (20.03135)/22 \approx0.9105.\)  
+%   Difference just before \(11.03135\) is about \(0 - 0.9105 = -0.9105.\) This is very large in absolute value.
+
+% - As \(u\) moves from 11.03135 to 18.36465, \(G_2(u)\) increases from 0 to 1 linearly. Eventually, at \(u=18.36465\), both are 1. The largest absolute difference occurs near \(u=11.03135\), about 0.9105.
+
+% Thus:
+% \[
+% \sup_u|G_2(u)-G_0(u)| \approx 0.9105.
+% \]
+
+% For the mixture:
+% \[
+% \sup_u|F_Y(u)-G_0(u)| = p_2 \times 0.9105 = 0.11283 \times 0.9105 \approx 0.1027.
+% \]
+
+\subsection{KS Test Critical Values and Detection Probability}
+
+% Under \(H_0\), the KS test critical values at significance \(\alpha=0.05\) are approximately:
+% \[
+% D_{n,\alpha} \approx \frac{1.36}{\sqrt{n}}.
+% \]
+
+% 1. For \(n=110\):
+% \[
+% D_{110,0.05} \approx \frac{1.36}{\sqrt{110}} \approx \frac{1.36}{10.488} \approx 0.1297.
+% \]
+
+% - For the \(G_1\)-mixture: \(\sup|F_Y-G_0|\approx 0.0226\). This "signal" is much smaller than 0.1297. Thus, at \(n=110\), it's unlikely we reject \(H_0\). The p-value would be large (not close to 0.05).
+
+% - For the \(G_2\)-mixture: \(\sup|F_Y-G_0|\approx 0.1027\), which is still less than 0.1297, but closer. There is a moderate chance to reject at a higher \(\alpha\) level, but at \(\alpha=0.05\) it's borderline. The p-value might be around 0.1–0.2.
+
+% 2. For \(n=1100\):
+% \[
+% D_{1100,0.05} \approx \frac{1.36}{\sqrt{1100}} \approx \frac{1.36}{33.166} \approx 0.041.
+% \]
+
+% - For the \(G_1\)-mixture: \(\sup|F_Y-G_0|\approx 0.0226\), which is still less than 0.041. Even with a large sample, the difference is too small. Likely no rejection at \(\alpha=0.05.\)
+
+% - For the \(G_2\)-mixture: \(\sup|F_Y-G_0|\approx 0.1027\) is now much larger than 0.041. This is a substantial difference. With \(n=1100\), the KS test will almost certainly reject \(H_0\) at \(\alpha=0.05\) (and even at much lower \(\alpha\)).
+
+\subsection{Approximate p-values}
+
+% - **For the \(G_1\)-mixture:**
+%   The inherent difference (0.0226) is about a quarter to half of the typical KS fluctuation at \(n=1100\) and even smaller compared to the fluctuation at \(n=110\). The p-value is therefore large, and the test has low power to detect this small mixture. You will not reject \(H_0\) at standard significance levels for either \(n=110\) or \(n=1100\).
+
+% - **For the \(G_2\)-mixture with \(n=110\):**
+%   The difference (0.1027) is about 0.79 times the 5% critical value (0.1297). This might lead to a p-value somewhat greater than 0.05, perhaps around 0.1–0.2. It's borderline; you might not reject at \(\alpha=0.05\).
+
+% - **For the \(G_2\)-mixture with \(n=1100\):**
+%   The difference (0.1027) is more than double the 5% critical value (0.041). The p-value will be extremely small (<0.001). You will definitely reject \(H_0\).
+
+\subsection{Conclusion}
+
+% By analytically comparing the theoretical distributions, we have:
+
+% - **Mixture with \(G_1\)**:  
+%   \(\sup|F_Y-G_0|\approx 0.0226.\)  
+%   Even at \(n=1100\), the KS critical value for \(\alpha=0.05\) is about 0.041, which is larger than 0.0226. Hence, the KS test will not reject \(H_0\) at common significance levels. The p-value is relatively large.
+
+% - **Mixture with \(G_2\)**:  
+%   \(\sup|F_Y-G_0|\approx 0.1027.\)  
+%   For \(n=110\), this difference is close but still smaller than the 5% critical value of about 0.1297, so likely no rejection at \(\alpha=0.05\), but the p-value may not be very large (still possibly >0.05).  
+%   For \(n=1100\), the difference (0.1027) far exceeds the 5% critical value (0.041). This means a very small p-value and a definite rejection of \(H_0\).
+
+% Thus, analytically, the KS test can detect the mixture with \(G_2\) at a large sample size easily, but struggles with \(G_1\) even for a large sample. No empirical simulation is needed to see that the magnitude of the deviation from \(G_0\) plays the decisive role.
 
 \end{document}
