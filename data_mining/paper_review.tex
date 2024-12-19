@@ -1,0 +1,100 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{authblk}
+
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{white}, % Set background color
+    basicstyle=\ttfamily\footnotesize, % Use a typewriter font
+    commentstyle=\color{gray},     % Comment color
+    keywordstyle=\color{blue},     % Keyword color
+    numberstyle=\tiny\color{gray}, % Line number color
+    stringstyle=\color{red},       % String color
+    breaklines=true,               % Automatically break long lines
+    frame=single,                  % Draw a frame around the code
+    numbers=left,                  % Line numbers on the left
+    numbersep=5pt,                 % Distance of line numbers from code
+    showspaces=false,              % Don't show spaces
+    showstringspaces=false,        % Don't show spaces in strings
+    showtabs=false,                % Don't show tabs
+    tabsize=4                      % Set default tab size
+}
+
+% Apply the custom style
+\lstset{style=mystyle}
+
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\usepackage[backend=biber, style=numeric, citestyle=numeric]{biblatex} % Load biblatex with the numeric style
+\addbibresource{references.bib} % Specify the database of bibliographic references
+\usepackage{hyperref} % For clickable links
+
+\title{Project Review: "The Influence of Wholesale Electricity Prices on Consumption Patterns: A Data-Driven Analysis"}
+
+\author{Aleksandr Jan Smoliakov, Danial Yntykbay, Davide Giuseppe Griffon}
+
+\date{}
+
+\titleformat{\paragraph}
+{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing{\paragraph}
+{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+
+\begin{document}
+
+\maketitle
+
+\section{Overall Assessment}
+
+\hspace{1.5em}The choice of topic is interesting and relevant. Analysis of the data is appropriate and complete. Relevant predictors were selected for analysis, their correlations and interactions were studied and four different model types (linear, ridge, lasso, SVM) were fit and evaluated, with their strengths and weaknesses discussed in the paper. Unfortunately, the project seemingly ignores (or at least doesn’t mention) the fact that the relationship between the price and consumption is two-directional. However, under the assumptions made in the paper the modelling methodology is sound and appropriate. The interpretation of the findings is fine, with valid conclusions reached. The paper has real-world applicability.
+
+\section{Strengths}
+
+\hspace{1.5em}The research topic is interesting and relevant, and has real-world applicability.
+
+The project implements four modeling approaches - Linear, Ridge, Lasso, and Support Vector Regression - for analyzing electricity consumption patterns. This allows to capture various types of predictor-outcome relationships and select the best-fitting model.
+
+The technical execution includes data preparation and model validation. The team tested statistical assumptions and made adjustments where necessary. The differentiation between B2B and B2C consumers is a good insight and reflects the different underlying usage patterns.
+
+The analysis examines patterns and relationships within electricity consumption data. The research explored variable interactions, e.g. how consumption patterns vary across temporal and environmental conditions. The study provides insights about price elasticity, though causal relationships need deeper examination.
+
+\section{Areas for Improvement}
+
+\paragraph{Datasets}
+
+\begin{itemize}
+   \item We did not find any links to the datasets in the paper. The 11 cities and towns studied in the project were not listed. Additionally, the available raw data is not described, so it’s unclear whether the chosen predictors make sense.
+\end{itemize}
+
+\paragraph{Analysis}
+
+\begin{itemize}
+   \item Quoting Section 4, “Exploratory data analysis” - “Surprisingly, there is a positive correlation between price and electricity consumption that must be analyzed further.” It’s not very surprising at there is a two-directional effect at play. The price influences the consumption and vice versa - during periods of high overall consumption the electricity price goes up due to the supply-demand dynamics.
+   \item The paper did not describe the process for determining the elasticity, and this was not present in the code.
+   In the results, the conditions (season, peak/off-peak hours) for the effects of price, temperature and other variables on the consumption are not provided.
+\end{itemize}
+
+\paragraph{Feature engineering and modelling}
+
+\begin{itemize}
+   \item Time of the day was modelled as a numeric variable, which will not capture many cyclical trends.
+\end{itemize}
+
+\section{Questions}
+
+\begin{itemize}
+   \item The price could be seen as both a predictor and an outcome of the consumption. What methods did you use to make sure you’re only capturing the effects of the price on the the consumption, and not vice versa?
+   \item How did you determine the price elasticity?
+   \item Which of the used models or predictors can capture U-shaped relationship between the temperature and the electricity consumption (high during temperature extremes, lower in moderate temperatures)?
+\end{itemize}
+
+\end{document}
