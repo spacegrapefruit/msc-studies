@@ -427,30 +427,87 @@ As \(N \to \infty\), if \(F_Y \neq G_0\), the empirical distribution \(F_N\) con
 \section{Task 2: Applications of Bootstrap Technique}
 
 In this section we will
-* test Complex Goodness of Fit Hypothesis,
-* check bootstrap consistency,
-* compare bootstrap confidence interval construction methods.
 
-We will use the same parametric family \(\mathcal{G}_5(\Theta)\) and the same distributions \(G_0, G_1, G_2\) as in Task 1.
-
-\[
-G_0(u) = U(-9, 13), \quad G_1(u) = U(-31, 35), \quad G_2(u) = U(11.0351, 18.3685).
-\]
-
-In this section we will use the sample sizes from Task 1, \(N_1 = 110\) and \(N_2 = 1100\).
-
-The bootstrap sample size will be \(B = 100 \times N\), where \(N\) is the original sample size.
+\begin{itemize}
+    \item Test Complex Goodness of Fit Hypothesis,
+    \item Check bootstrap consistency,
+    \item Compare bootstrap confidence interval construction methods.
+\end{itemize}
 
 \subsection{Testing Goodness-of-Fit by Bootstrap}
 
-First we will test the Complex Goodness of Fit Hypothesis which asserts that the unknown distribution function \(F_Y\) belongs to the parametric family \(\mathcal{G}(\Theta)\):
+In Task~1, we considered a simple hypothesis test for the goodness-of-fit of the data to the distribution \(G_0\). In this section, we will test the complex Goodness-of-Fit hypothesis that the unknown distribution function \(F_Y\) belongs to the parametric family \(\mathcal{G}(\Theta)\):
+
 \[
-H_0: F_Y \in \mathcal{G}(\Theta) \textbf{ versus } H': F_Y \notin \mathcal{G}(\Theta).
+  H_0: F_Y \in \mathcal{G}(\Theta)
+  \quad\text{versus}\quad
+  H': F_Y \notin \mathcal{G}(\Theta).
 \]
 
-We will make use of the parametric bootstrap technique to test this hypothesis. The test statistic is the Kolmogorov-Smirnov test statistic and the significance levels are \(\alpha = 0.1\).
+We will use the same parametric family \(\mathcal{G}_5(\Theta)\) and the same distributions \(G_0, G_1, G_2\) as in Task~1:
+\[
+    G_0(u) = U(-9, 13), \quad G_1(u) = U(-31, 35), \quad G_2(u) = U(11.0351, 18.3685).
+\]
 
+We will make use of the parametric bootstrap technique to test the hypothesis. The test statistic is the Kolmogorov-Smirnov test statistic and the significance level is \(\alpha = 0.1\).
 
+The parametric bootstrap algorithm for testing this hypothesis is as follows:
+
+\begin{enumerate}
+    \item \textbf{Generate the sample:} With sample sizes \(N_1 = 110\) and \(N_2 = 1100\), generate data \((Y_t)_{1}^N\) from the mixture distributions \(F_Y\) from Task~1:
+    \[
+      (1 - p_1) \, G_0 + p_1 \, G_1  
+      \quad\text{or}\quad  
+      (1 - p_2) \, G_0 + p_2 \, G_2,
+    \]  
+    \item \textbf{Estimate \(\hat{\boldsymbol{\theta}}_N\):} For the sample \(Y^N\), assume that \(F_Y \in \mathcal{G}(\Theta)\). We estimate the parameter \(\boldsymbol{\theta}\) by the maximum likelihood estimator \(\hat{\boldsymbol{\theta}}_N\). For the uniform distribution, the MLE amounts to \(\hat{a} = \min(Y^N)\), \(\hat{b} = \max(Y^N)\). We denote the fitted distribution by \(\hat{G}_N(u) := G(u|\hat{\theta}_N)\).
+    \item \textbf{Calculate the test statistic:} Calculate the Kolmogorov-Smirnov test statistic T comparing the EDF of the data \(Y^N\) and the fitted distribution \(\hat{G}_N\). We denote the test statistic by \(\hat{T}_N\).
+    \item \textbf{Generate the bootstrap samples:} Generate \(B = 100 \times N\) bootstrap samples \( Y^{N*}_b, b \in \{1, \ldots, B\} \) by resampling with replacement from the original sample \(Y^N\). For each bootstrap sample \(Y^{N*}_b\), estimate the parameter \(\theta\) by the same method as in step 2, obtaining \(\hat{\theta}^{N*}_b\).
+    \item \textbf{Calculate the bootstrap test statistics:} For each bootstrap sample \(Y^{N*}_b\), calculate the Kolmogorov-Smirnov test statistic \(\hat{T}^*_{N,b}\) comparing the EDF of the data \(Y^{N*}_b\) and the fitted distribution \(G(u|\hat{\theta}^*_{N,b})\).
+    \item \textbf{Calculate the approximate p-value:} Calculate the p-value as the proportion of bootstrap test statistics \(\hat{T}^*_{N,b}\) that are greater than \(\hat{T}_N\). If the p-value is less than the significance level \(\alpha\), reject the null hypothesis. Formally:
+    \[
+        \hat{p}^* = \hat{p}^*(T, \mathcal{G}, Y^N, B) = \frac{\#\{b: \hat{T}^*_{N,b} > \hat{T}_N\}}{B}.
+    \]
+    \item \textbf{Decision:} If \(\hat{p}^* < \alpha\), reject the null hypothesis \(H_0\). Otherwise, do not reject \(H_0\).
+\end{enumerate}
+
+\subsubsection{Simulation Results}
+
+We will now simulate the parametric bootstrap procedure for the two sample sizes \(N_1 = 110\) and \(N_2 = 1100\). We will generate \(B = 100 \times N\) bootstrap samples and calculate the p-values for each sample.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Mixture of Distributions} & \textbf{Sample Size} & \textbf{Test Statistic} & \textbf{p-value} & \textbf{Decision} \\ \hline
+\(G_0, G_1\) & 110 & 0.3419 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
+\(G_0, G_1\) & 1100 & 0.3066 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
+\(G_0, G_2\) & 110 & 0.0944 & 0.266 & No rejection \\ \hline
+\(G_0, G_2\) & 1100 & 0.1203 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Comparison with Simple Hypothesis Tests and Discussion}
+
+In Task~1(b), we tested a simple hypothesis
+\[
+H_0: F_Y = G_0 \textbf{ versus } H': F_Y \neq G_0
+\]
+where \(G_0\) was a fixed, known distribution. Here, by contrast, we do not know the parameter \(\theta\) in advance. The parametric bootstrap procedure accounts for the uncertainty in \(\theta\) by re-fitting the parameter for each bootstrap sample.
+
+The results of the tests are interesting and not consistent with the Task~1 results. In Task~1, we found that the mixture with \(G_1\) was not rejected at \(\alpha=0.1\) for both sample sizes. However, the parametric bootstrap test rejected the hypothesis for both sample sizes. The mixture with \(G_2\) was rejected at \(\alpha=0.01\) for \(N=1100\) in Task~1, and the bootstrap test also rejected the hypothesis at \(\alpha=0.1\).
+
+In this case, the discrepancy related to \(G_1\) can be explained by the following reasons:
+
+\begin{itemize}
+    \item We are using Kolmogorov-Smirnov tests. This statistic is sensitive to the maximum deviation between the empirical distribution function and the fitted distribution.
+    \item Since \(p_1\) and \(p_2\) are small, the mixture distributions are close to the basic distribution \(G_0\), the estimated Kolmogorov-Smirnov test statistics are low and the associated p-values are high.
+    \item In Task~2, we do not know the parameter a priori. The maximum likelihood estimator is used to estimate \(\theta\) from the data, and the estimated values have a significantly wider range than the basic distribution. This leads to higher test statistics and lower p-values in the \(G_1\) mixture.
+\end{itemize}
+
+Tests on the mixture with \(G_2\) are consistent between Task~1 and Task~2. The range of the parameter \(\theta\) is narrower for \(G_2\) than for \(G_1\), and the estimated distribution is closer to the basic distribution \(G_0\). This leads to lower test statistics and higher p-values in the \(G_2\) mixture. More samples are needed to detect the deviation a simple uniform distribution.
+
+If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the parametric bootstrap can be used to test whether the data fits the parametric family. Nonparametric bootstrap can be used when the parametric family cannot be assumed. The nonparametric bootstrap procedure is similar to the parametric bootstrap, but the parameter \(\theta\) is not estimated. While the parametric bootstrap is more powerful when the parametric family is correct, the nonparametric bootstrap is more robust when the parametric family is incorrect.
 
 \subsection{Checking Bootstrap Consistency}
 
