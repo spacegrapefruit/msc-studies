@@ -12,12 +12,12 @@ G(u) := p1*G1(u) + ... + pm*Gm(u) = sum(p_k*G_k(u), k=1..m), u ∈ R, (1)
 
 is called a mixture of distribution functions G1, ..., Gm with probabilities (or weights) p1, ..., pm.
 G is the distribution function of the random variable Z generated in the following way:
-1. Choose k ∈ [1, m] := {1, ..., m} at random with the corresponding probabilities p1, ..., pm. The chosen number is denoted by k∗.
-2. Generate a random variable Z_k∗ according to the distribution function G_k∗ and assign Z <- Z_k∗.
+1. Choose k ∈ [1, m] := {1, ..., m} at random with the corresponding probabilities p1, ..., pm. The chosen number is denoted by k*.
+2. Generate a random variable Z_k* according to the distribution function G_k* and assign Z <- Z_k*.
 A brief representation of this algorithm:
-Z <- Z_k∗, k∗ ∼ Multinomm(1, p1, ..., pm), Z_k∗ ∼ G_k (k ∈ [1, m]). (2)
+Z <- Z_k*, k* ∼ Multinomm(1, p1, ..., pm), Z_k* ∼ G_k (k ∈ [1, m]). (2)
 When m = 2, the algorithm reduces to
-Z <- Z_(1+k)∗, k∗ ∼ Binomial(1, p2), Z_k∗ ∼ G_k (k = 1, 2). (3)
+Z <- Z_(1+k)*, k* ∼ Binomial(1, p2), Z_k* ∼ G_k (k = 1, 2). (3)
 
 Let
 𝒢(Θ) := {G(·| θ), θ ∈ Θ} (4)
@@ -51,117 +51,46 @@ It is recommended to take a bootstrap sample size B much greater than a initial 
 
 ## Testing Goodness-of-Fit by Bootstrap
 Testing Complex Goodness of Fit Hypothesis. This problem continues that of (b) in Task 1 (Testing Goodness-of-Fit).
-Complex Goodness of Fit Hypothesis asserts that the unknown distribution function G0 belongs to some given parametric family G(Θ) of distribution functions:
+Complex Goodness of Fit Hypothesis asserts that the unknown distribution function G_0 belongs to some given parametric family G(Θ) of distribution functions:
 H0: FY ∈ G(Θ) versus H': FY ∈ G / (Θ). (11)
 The task is to test (11) by making use of parametric bootstrap. Let T denote any of goodness-of-fit statistics: Kolmogorov-Smirnov, Cramer–von Mises or Anderson-Darling. The significance level is α = 0.1.
-* The parametric family G(Θ) of distribution functions, the basic distribution function G0, the distribution functions G1 and G2, the definitions of distribution function FY for the initial data simulation, as well as numeric values of the parameters and other quantities are the same as in Task 1.
+* The parametric family G(Θ) of distribution functions, the basic distribution function G_0, the distribution functions G_1 and G_2, the definitions of distribution function FY for the initial data simulation, as well as numeric values of the parameters and other quantities are the same as in Task 1.
 
 Algorithm:
-1. Select or generate the same (analogous) data Y^N := (Y_t)_1^N
-as in item (b) of Task 1. The two different cases (depending, respectively, on G1 and G2) of the underlying distribution FY are to be considered.
-2. Assume that FY ∈ G(Θ) and estimate the unknown parameter θ by maximum likelihood
-(ML) or method of moments (MM). Let bθN be the estimate obtained and GbN (u) := G(u|
-bθN ). Calculate value T_N of the goodness-of-fit statistic T when comparing the EDF of the data Y^N with GbN . Roughly speaking, T_N is the value of the statistic T for the simple testing problem
+1. Select or generate the same (analogous) data Y^N := (Y_t)_1^N as in item (b) of Task 1. The two different cases (depending, respectively, on G_1 and G_2) of the underlying distribution FY are to be considered.
+2. Assume that FY ∈ G(Θ) and estimate the unknown parameter θ by maximum likelihood (ML) or method of moments (MM). Let θ_N be the estimate obtained and G_N (u) := G(u|θ_N ). Calculate value T_N of the goodness-of-fit statistic T when comparing the EDF of the data Y^N with G_N . Roughly speaking, T_N is the value of the statistic T for the simple testing problem
 H0: FY = G_N versus H': F_Y != G_N , (12)
 where G_N (actually the θ_N ) is treated as known and nonrandom.
-3. Generate independent bootstrap samples Y
-N∗
-b
-, b ∈ [1, B], Y
-∗ ∼ GbN . For each Y
-N∗
-b
-, estimate
-the unknown parameter θ by the same method as in Step 2 (the estimate obtained is denoted
-by bθ
-∗
-N,b = bθ(Y
-N∗
-b
-)) and calculate values Tb∗
-N,b of the test statistic T when comparing the EDF
-of the ”bootstrapt” data Y
-N∗
-b with Gb∗
-N,b. Here Gb∗
-N,b(u) := G(u|
-bθ
-∗
-N,b) (b ∈ [1, B]).
+3. Generate independent bootstrap samples Y_b^(N*), b ∈ [1, B], Y* ∼ G_N . For each Y_b^(N*), estimate the unknown parameter θ by the same method as in Step 2 (the estimate obtained is denoted by θ_(N,b)* = θ_(Y_b^(N*))) and calculate values T_(N,b)* of the test statistic T when comparing the EDF of the "bootstrap" data Y_b^(N*) with G_(N,b)*. Here G_(N,b)*(u) := G(u|θ_(N,b)*), b ∈ [1, B].
 4. Find approximate bootstrap p-value for the test statistic T:
-pb
-∗ = pb
-∗
-(T, G, Y N , B) =
-#{b : Tb∗
-N,b > TbN }
-B
-. (13)
-4
-* Compare simulation results of testing complex goodness-of-fit hypothesis (11) by making use
-of parametric bootstrap with the goodness-of-fit testing results of Task 1. Draw conclusions.
-* Make recommendations regarding applications of simple nonparametric bootstrap for testing
-(11).
-4.2 Checking Bootstrap Consistency
-Let Z ∼ Gamma(a, b) where a > 0 is the shape parameter and b > 0 is the scale parameter
-of the Gamma distribution, and let F1 denote the distribution function of Z with parameters
-a = N /(N + S), b = S.
-It is well known that
-Z1 + Z2 ∼ Gamma(a1 + a2, b), if Z` ∼ Gamma(a`
-, b), ` = 1, 2, Z1, Z2 are independent. (14)
-Task A: Let Y
-N be SRS of Y ∼ F1, N = (1 + N ) · 10. Check the consistency of the parametric
-and simple nonparametric bootstrap for the sample mean Y N by comparing its true distribution
-derived analytically from (14) and the bootstrap estimators of this distribution in an appropriate
-way. Use Kolmogorov-Smirnov, Cramer–von Mises or Anderson-Darling statistics as goodness-of-fit
-measures.
-Let F2 ∼ P areto(c, d) be the Pareto (Type I; see https://en.wikipedia.org/wiki/Pareto_
-distribution) distribution function with the scale parameter c > 0 and the shape parameter
-d > 0. Take c = S and d = N /(N + S),.
-Task B: Let Y
-N be SRS of Y ∼ F2, N = (1+N )·10. Check the consistency of the parametric and
-simple nonparametric bootstrap for the sample mean Y N by comparing approximation of its true
-distribution obtained by Monte Carlo simulations and the bootstrap estimators of this distribution
-in an appropriate way. Use Kolmogorov-Smirnov, Cramer–von Mises or Anderson-Darling statistics
-as goodness-of-fit measures.
+p* = p*(T, G, Y^N, B) = #{b : T_(N,b)* > T_N } / B. (13)
+
+* Compare simulation results of testing complex goodness-of-fit hypothesis (11) by making use of parametric bootstrap with the goodness-of-fit testing results of Task 1. Draw conclusions.
+* Make recommendations regarding applications of simple nonparametric bootstrap for testing (11).
+
+## Checking Bootstrap Consistency
+Let Z ∼ Gamma(a, b) where a > 0 is the shape parameter and b > 0 is the scale parameter of the Gamma distribution, and let F_1 denote the distribution function of Z with parameters a = 1/2, b = 9.
+It is well known that Z_1 + Z_2 ∼ Gamma(a_1 + a_2, b), if Z_l ∼ Gamma(a_l, b), l = 1, 2, Z_1, Z_2 are independent. (14)
+Task A: Let Y^N be SRS of Y ∼ F_1, N = 100. Check the consistency of the parametric and simple nonparametric bootstrap for the sample mean Y_N by comparing its true distribution derived analytically from (14) and the bootstrap estimators of this distribution in an appropriate way. Use Kolmogorov-Smirnov as goodness-of-fit measure.
+Let F_2 ∼ Pareto(c, d) be the Pareto (Type I) distribution function with the scale parameter c > 0 and the shape parameter d > 0. Take c = 9 and d = 1/2.
+Task B: Let Y^N be SRS of Y ∼ F_2, N = 100. Check the consistency of the parametric and simple nonparametric bootstrap for the sample mean Y_N by comparing approximation of its true distribution obtained by Monte Carlo simulations and the bootstrap estimators of this distribution in an appropriate way. Use Kolmogorov-Smirnov as goodness-of-fit measure.
+
 Discuss the results and draw conclusions. The significance level is α = 0.1.
-4.3 Bootstrap Confidence Intervals
-Let Y
-N be SRS of Y ∼ P areto(c, d) with c = S, d = 2 + N , N = (1 + N )· 10. The confidence level
-is γ = 0.90.
-Task A: The parameter of interest is the variance of the sample mean Y N .
-Compare γ-confidence intervals – normal, pivotal, percentile – obtained by making use of parametric bootstrap, simple nonparametric bootstrap and (direct) Monte Carlo simulations with the
-true values c = S and d = 2 + N of the parameters. Find (estimate) true coverages of the resulting
-γ-confidence intervals (optional1
-).
+
+## Bootstrap Confidence Intervals
+Let Y^N be SRS of Y ~ Pareto(c, d) with c = 9, d = 11, N = 100. The confidence level is γ = 0.90.
+Task A: The parameter of interest is the variance of the sample mean Y_N.
+Compare γ-confidence intervals – normal, pivotal, percentile – obtained by making use of parametric bootstrap, simple nonparametric bootstrap and (direct) Monte Carlo simulations with the true values c = 9 and d = 11 of the parameters.
 The maximum likelihood estimator of the Pareto distribution parameter c is given by
-cbML := Y(1) = min
-j∈[1,N]
-Yj . (15)
-Task B: The parameter of interest is the variance of Y(1), i.e., the variance of the maximum
-likelihood estimator cbML of c.
-For the variance of Y(1), compare γ-confidence intervals – normal, pivotal, percentile – obtained
-by making use of the three mentioned methods: parametric bootstrap, simple nonparametric bootstrap and (direct) Monte Carlo simulations with the true values c = S and d = 2 + N of the
-parameters. Find (estimate) true coverages of the resulting γ-confidence intervals (optional 1
-).
+c_ML := Y_(1) = min j∈[1,N] Y_j (15)
+Task B: The parameter of interest is the variance of Y_(1), i.e., the variance of the maximum likelihood estimator c_ML of c.
+For the variance of Y_(1), compare γ-confidence intervals – normal, pivotal, percentile – obtained by making use of the three mentioned methods: parametric bootstrap, simple nonparametric bootstrap and (direct) Monte Carlo simulations with the true values c = 9 and d = 11 of the parameters.
+
 Discuss the results and draw conclusions.
-1Finding true coverage is much more computer intensive task. Therefore it is optional.
 
 # Task 3: Nonparametric density estimation
 The task is to compare performance of various nonparametric density estimators.
-Simulated data. The data is generated as a SRS from a mixture (Section 1) with the respective
-probabilities π`
-, ` = 0, 1, 2 of the same distributions G`
-, ` = 0, 1, 2, described in Sections 2 and 3:
-G(u) := π0G0(u) + π1G1(u) + π2G2(u), π1 :=
-S
-1 + I1 + 2N + S
-, π2 :=
-N
-1 + I1 + 2N + S
-. (16)
-Task: Estimate the distribution density g(u) := G0
-(u) nonparametrically by making use of the
-Least Squared Cross-Validation, the Refind Plug-in Method for Bandwidth Selection, the Smoothed
-Bootstrap for Bandwidth Selection and k-Nearest Neighbours Density Estimator.
+Simulated data. The data is generated as a SRS from a mixture (Section 1) with the respective probabilities π_l, l = 0, 1, 2 of the same distributions G_l, l = 0, 1, 2, described in Sections 2 and 3:
+G(u) := π_0*G_0(u) + π_1*G_1(u) + π_2*G_2(u), π_1 := 6/33, π2 := 6/33. (16)
+Task: Estimate the distribution density g(u) := G_0(u) nonparametrically by making use of the Least Squared Cross-Validation, the Refind Plug-in Method for Bandwidth Selection, the Smoothed Bootstrap for Bandwidth Selection and k-Nearest Neighbours Density Estimator.
 Compare estimators with each other and with the true density g and discuss the results.

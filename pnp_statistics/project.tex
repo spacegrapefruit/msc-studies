@@ -365,12 +365,12 @@ For the mixture, taking \(p_2 \approx 0.1135\):
 
 \subsection{Critical Values and Detection Probability}
 
-Under \(H_0\), the Kolmogorov-Smirnov test critical values at significance \(\alpha_1=0.1\) for sample sizes \(n=110\) and \(\alpha_2=0.01\) for \(n=1100\) are approximately:
+Under \(H_0\), the Kolmogorov-Smirnov test critical values at significance \(\alpha_1=0.1\) and \(\alpha_2=0.01\) are approximately:
 \[
-D_{N,\alpha} \approx \frac{1.22}{\sqrt{N}} \quad \text{for} \quad \alpha=0.1,
+D_{N,\alpha_1} \approx \frac{1.22}{\sqrt{N}} \quad \text{for} \quad \alpha_1=0.1,
 \]
 \[
-D_{N,\alpha} \approx \frac{1.63}{\sqrt{N}} \quad \text{for} \quad \alpha=0.01.
+D_{N,\alpha_2} \approx \frac{1.63}{\sqrt{N}} \quad \text{for} \quad \alpha_2=0.01.
 \]
 
 For \(N=110\):
@@ -423,5 +423,37 @@ By analytically comparing the theoretical distributions, we have:
 It is evident that for Kolmogorov-Smirnov tests, the magnitude of the deviation from \(G_0\) and the sample size play the decisive role.
 
 As \(N \to \infty\), if \(F_Y \neq G_0\), the empirical distribution \(F_N\) converges to \(F_Y\), and thus \(D_N\) converges to \(\sup_u |F_Y(u)-G_0(u)|\).
+
+\section{Task 2: Applications of Bootstrap Technique}
+
+In this section we will
+* test Complex Goodness of Fit Hypothesis,
+* check bootstrap consistency,
+* compare bootstrap confidence interval construction methods.
+
+We will use the same parametric family \(\mathcal{G}_5(\Theta)\) and the same distributions \(G_0, G_1, G_2\) as in Task 1.
+
+\[
+G_0(u) = U(-9, 13), \quad G_1(u) = U(-31, 35), \quad G_2(u) = U(11.0351, 18.3685).
+\]
+
+In this section we will use the sample sizes from Task 1, \(N_1 = 110\) and \(N_2 = 1100\).
+
+The bootstrap sample size will be \(B = 100 \times N\), where \(N\) is the original sample size.
+
+\subsection{Testing Goodness-of-Fit by Bootstrap}
+
+First we will test the Complex Goodness of Fit Hypothesis which asserts that the unknown distribution function \(F_Y\) belongs to the parametric family \(\mathcal{G}(\Theta)\):
+\[
+H_0: F_Y \in \mathcal{G}(\Theta) \textbf{ versus } H': F_Y \notin \mathcal{G}(\Theta).
+\]
+
+We will make use of the parametric bootstrap technique to test this hypothesis. The test statistic is the Kolmogorov-Smirnov test statistic and the significance levels are \(\alpha = 0.1\).
+
+
+
+\subsection{Checking Bootstrap Consistency}
+
+\subsection{Bootstrap Confidence Intervals}
 
 \end{document}

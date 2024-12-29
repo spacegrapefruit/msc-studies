@@ -1,6 +1,13 @@
+__pycache__/
+.env
+.ipynb_checkpoints/
+.ruff_cache
+image_analysis/*/*/output/
 *.aux
 *.fdb_latexmk
 *.fls
 *.log
 *.out
 *.synctex.gz
+*.toc
+nessun_dorma.wav

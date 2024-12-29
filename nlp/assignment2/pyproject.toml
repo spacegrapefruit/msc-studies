@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "assignment2"
+version = "0.1.0"
+description = ""
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10, <3.12"
+librosa = "^0.10.2.post1"
+matplotlib = "^3.9.2"
+pesq = "^0.0.4"
+tikzplotlib = "^0.10.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.7.2"
+ipykernel = "^6.29.5"
+nbconvert = "^7.16.4"
+pygments = "^2.18.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
