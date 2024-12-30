@@ -482,8 +482,8 @@ We will now simulate the parametric bootstrap procedure for the two sample sizes
 \textbf{Mixture of Distributions} & \textbf{Sample Size} & \textbf{Test Statistic} & \textbf{p-value} & \textbf{Decision} \\ \hline
 \(G_0, G_1\) & 110 & 0.3419 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
 \(G_0, G_1\) & 1100 & 0.3066 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
-\(G_0, G_2\) & 110 & 0.0944 & 0.266 & No rejection \\ \hline
-\(G_0, G_2\) & 1100 & 0.1203 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
+\(G_0, G_2\) & 110 & 0.0944 & 0.272 & No rejection \\ \hline
+\(G_0, G_2\) & 1100 & 0.0861 & \(< 10^{-5}\) & Rejection at \(\alpha=0.1\) \\ \hline
 \end{tabular}
 \end{table}
 
@@ -495,7 +495,7 @@ H_0: F_Y = G_0 \textbf{ versus } H': F_Y \neq G_0
 \]
 where \(G_0\) was a fixed, known distribution. Here, by contrast, we do not know the parameter \(\theta\) in advance. The parametric bootstrap procedure accounts for the uncertainty in \(\theta\) by re-fitting the parameter for each bootstrap sample.
 
-The results of the tests are interesting and not consistent with the Task~1 results. In Task~1, we found that the mixture with \(G_1\) was not rejected at \(\alpha=0.1\) for both sample sizes. However, the parametric bootstrap test rejected the hypothesis for both sample sizes. The mixture with \(G_2\) was rejected at \(\alpha=0.01\) for \(N=1100\) in Task~1, and the bootstrap test also rejected the hypothesis at \(\alpha=0.1\).
+The results of the tests are interesting and not exactly consistent with the Task~1 results. In Task~1, we found that the mixture with \(G_1\) was not rejected at \(\alpha=0.1\) for both sample sizes. However, the parametric bootstrap test correctly rejected the null hypothesis for both sample sizes. The mixture with \(G_2\) was rejected at \(\alpha=0.01\) for \(N=1100\) in Task~1, and the bootstrap test also rejected the hypothesis at \(\alpha=0.1\).
 
 In this case, the discrepancy related to \(G_1\) can be explained by the following reasons:
 
@@ -507,9 +507,7 @@ In this case, the discrepancy related to \(G_1\) can be explained by the followi
 
 Tests on the mixture with \(G_2\) are consistent between Task~1 and Task~2. The range of the parameter \(\theta\) is narrower for \(G_2\) than for \(G_1\), and the estimated distribution is closer to the basic distribution \(G_0\). This leads to lower test statistics and higher p-values in the \(G_2\) mixture. More samples are needed to detect the deviation a simple uniform distribution.
 
-% FIXME
-
-If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the parametric bootstrap can be used to test whether the data fits the parametric family. Nonparametric bootstrap can be used when the parametric family cannot be assumed. The nonparametric bootstrap procedure is similar to the parametric bootstrap, but the parameter \(\theta\) is not estimated. While the parametric bootstrap is more powerful when the parametric family is correct, the nonparametric bootstrap is more robust when the parametric family is incorrect.
+If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the parametric bootstrap can be used to test whether the data fits the parametric family. Nonparametric bootstrap can be used when the parametric family cannot be assumed. The nonparametric bootstrap procedure is similar to the parametric bootstrap, but the parameter \(\theta\) is not estimated, and the bootstrap samples are sampled from the empirical distribution function. While the parametric bootstrap is more powerful when the parametric family is correct, the nonparametric bootstrap makes fewer assumptions and is more robust.
 
 \subsection{Checking Bootstrap Consistency}
 
@@ -520,13 +518,13 @@ To assess whether the chosen bootstrap procedure consistently approximates the d
 \begin{enumerate}
   \item \textbf{Generate the sample:} Generate a sample of size \(N = 100\) for the given distribution (Gamma or Pareto).
   \item \textbf{Determine true distribution:} For the Gamma distribution, we compare \(\overline{Y}_N\) against the known true distribution. For the Pareto distribution, we will obtain the true distribution via Monte Carlo simulation.
-%   \item \textbf{Bootstrap aproximation:}
-%     \begin{itemize}
-%         % \item \textbf{Parametric Bootstrap:} Repeatedly sample from the fitted parametric model \(G(\cdot \mid \hat{\theta}_N)\), compute the statistic (e.g., \(\overline{Y}_N^*\)), and form the empirical distribution of these replicates.
-%         % \item \textbf{Nonparametric Bootstrap:} Resample \(\{Y_i\}\) \emph{with replacement} to form bootstrap samples, compute \(\overline{Y}_N^*\), and again build the empirical distribution.
-%     \end{itemize}
-%   \item \textbf{Compare distributions:} Compare the true distribution of the estimator to each bootstrap approximation using Kolmogorov-Smirnov distance between the bootstrap sample of \(\overline{Y}_N^*\) and the reference distribution.
-%   \item \textbf{Interpret the Results:} If the bootstrap distribution closely matches the true reference distribution, it indicates that the method is \emph{consistent} for approximating uncertainty about the statistic.
+  \item \textbf{Bootstrap procedure:} Generate \(B = 2000\) bootstrap samples using the method provided below.
+    \begin{itemize}
+        \item \textbf{Parametric bootstrap:} Sample from the fitted parametric model \(G(\cdot \mid \hat{\theta}_N)\), compute \(\overline{Y}_N^*\), and form the empirical distribution of these replicates.
+        \item \textbf{Nonparametric bootstrap:} Resample \(\{Y_i\}\) with replacement to form bootstrap samples, compute \(\overline{Y}_N^*\), and again build the empirical distribution.
+    \end{itemize}
+  \item \textbf{Compare distributions:} Compare the true distribution of the estimator to each bootstrap approximation using Kolmogorov-Smirnov distance between the bootstrap sample of \(\overline{Y}_N^*\) and the reference distribution.
+%   \item \textbf{Interpret the Results:} If the bootstrap distribution closely matches the true reference distribution, it indicates that the method is consistent for approximating uncertainty about the statistic.
 \end{enumerate}
 
 \subsubsection{Gamma Distribution}
@@ -544,7 +542,7 @@ The sample mean \(\overline{Y}_N\) is the sum of \(N\) independent and identical
 
 We will generate a sample of size \(N = 100\) from the Gamma distribution with \(a = 0.5\) and \(b = 9\). We will compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
 
-The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution will be calculated. We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of the Kolmogorov-Smirnov distance.
+We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
 The results are as follows:
 
@@ -558,9 +556,7 @@ Nonparametric & 0.3840 & \(1.36 \times 10^{-256}\) \\ \hline
 \end{tabular}
 \end{table}
 
-All of the results are significant at the \(\alpha = 0.1\) level. The bootstrap procedure is consistent for the sample mean \(\overline{Y}_N\) for the Pareto distribution.
-
-% FIXME consistent?
+All of the results are significant at the \(\alpha = 0.1\) level. We have rejected the null hypothesis with a high degree of confidence even though we have sampled from the true distribution. This shows that the bootstrap procedure does not closely approximate the true distribution of the sample mean \(\overline{Y}_N\) for the Gamma distribution with \(N = 100\). The sample size is not large enough to accurately estimate the distribution of the sample mean.
 
 \subsubsection{Pareto Distribution}
 
@@ -570,9 +566,7 @@ We will check the consistency of the bootstrap procedure for the sample mean \(\
 
 We will generate a sample of size \(N = 100\) from \(F_2\) and compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
 
-The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution will be calculated. We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of the Kolmogorov-Smirnov distance.
-
-% FIXME distance?
+We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
 The results are as follows:
 
@@ -586,31 +580,77 @@ Nonparametric & 0.2630 & \(1.67 \times 10^{-60}\) \\ \hline
 \end{tabular}
 \end{table}
 
-All of the results are significant at the \(\alpha = 0.1\) level. The bootstrap procedure is consistent for the sample mean \(\overline{Y}_N\) for the Pareto distribution.
-
-% FIXME consistent?
+All of the results are significant at the \(\alpha = 0.1\) level. We have rejected the null hypothesis with a high degree of confidence even though we have sampled from the true distribution. This shows that the bootstrap procedure does not closely approximate the true distribution of the sample mean \(\overline{Y}_N\) for the Pareto distribution with \(N = 100\). The sample size is not large enough to accurately estimate the distribution of the sample mean.
 
 \subsubsection{Discussion}
-
-% FIXME review discussion below
 
 The results of the consistency checks for the sample mean \(\overline{Y}_N\) are as follows:
 
 \begin{itemize}
-    \item For the Gamma distribution, the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is relatively high at 0.3593 for the parametric bootstrap and 0.3840 for the nonparametric bootstrap. The p-values are very low at \(1.07 \times 10^{-224}\) and \(1.36 \times 10^{-256}\) respectively. The bootstrap procedure is quite consistent for the sample mean \(\overline{Y}_N\) for the Gamma distribution.
-    \item For the Pareto distribution, the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is 0.1585 for the parametric bootstrap and 0.2630 for the nonparametric bootstrap. The p-values are \(3.02 \times 10^{-22}\) and \(1.67 \times 10^{-60}\) respectively. The bootstrap procedure is consistent for the sample mean \(\overline{Y}_N\) for the Pareto distribution.
-    \item Both the parametric and nonparametric bootstrap procedures produced surprisingly high Kolmogorov-Smirnov distances for both distributions. This indicates how our sample size \(N = 100\) is not large enough to accurately estimate the distribution of the sample mean \(\overline{Y}_N\), and the bootstrap procedure cannot approximate the true distribution well.
-    \item The parametric bootstrap procedure is more consistent than the nonparametric bootstrap procedure for both distributions. This is expected since the parametric bootstrap uses the true distribution of the sample mean to generate bootstrap samples, while the nonparametric bootstrap does not.
+    \item Both the parametric and nonparametric bootstrap procedures produced surprisingly very high Kolmogorov-Smirnov distances for both distributions. This indicates how our sample size \(N = 100\) is not large enough to accurately estimate the distribution of the sample mean \(\overline{Y}_N\), and the bootstrap procedure cannot approximate the true distribution well.
+    \item The parametric bootstrap procedure is closer than the nonparametric bootstrap procedure for both distributions. This is expected since the parametric bootstrap uses knowledge of the true distribution to generate bootstrap samples, while the nonparametric bootstrap does not.
+    \item In order to properly estimate the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\), we would need a larger sample size. The sample size \(N = 100\) is not sufficient to accurately estimate the distribution of the sample mean.
 \end{itemize}
 
 \subsection{Bootstrap Confidence Intervals}
 
-Let \(Y^N\) be a SRS of \(Y \sim Pareto(c, d)\) with \(c = 9\) and \(d = 11\). The sample size is \(N = 100\). The confidence level is \(\gamma = 0.90\). We will construct the confidence intervals for the mean \(\overline{Y}_N\) and the variance using parametric, nonparametric bootstrap, and Monte Carlo simulation.
-
-% FIXME variance?
+Let \(Y^N\) be a SRS of \(Y \sim Pareto(c, d)\) with \(c = 9\) and \(d = 11\). The sample size is \(N = 100\). The confidence level is \(\gamma = 0.90\). We will construct the confidence intervals for the mean \(\overline{Y}_N\) and the maximum likelihood estimator of the parameter \(c\) of the Pareto distribution (\(\hat{c}_{ML}\)) using parametric, nonparametric bootstrap, and Monte Carlo simulation.
 
 \subsubsection{Mean Confidence Intervals}
 
-\subsubsection{Variance Confidence Intervals}
+We perform parametric bootstrap, simple nonparametric bootstrap, and Monte Carlo simulation to construct the confidence intervals for the mean \(\overline{Y}_N\).
+
+Using each method, we calculate the normal, pivotal, and percentile confidence intervals for the mean \(\overline{Y}_N\) at the confidence level \(\gamma = 0.90\).
+
+For bootstrap, we generate \(B = 2000\) bootstrap samples. For Monte Carlo simulation, we generate \(M = 5000\) samples of size \(N = 100\) from the Pareto distribution.
+
+The results are as follows:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Mean} & \textbf{Normal CI} & \textbf{Pivotal CI} & \textbf{Percentile CI} \\ \hline
+Theoretical & 0.0099 & & & \\ \hline
+Parametric & 0.0173 & (0.0163, 0.0182) & (0.0163, 0.0182) & (0.0164, 0.0182) \\ \hline
+Nonparametric & 0.0222 & (0.0211, 0.0233) & (0.0211, 0.0233) & (0.0211, 0.0233) \\ \hline
+Monte Carlo & 0.0101 & (0.0097, 0.0105) & (0.0097, 0.0105) & (0.0098, 0.0105) \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{\(\hat{c}_{ML}\) Confidence Intervals}
+
+We perform parametric bootstrap, simple nonparametric bootstrap, and Monte Carlo simulation to construct the confidence intervals for the maximum likelihood estimator of the parameter \(c\) of the Pareto distribution (\(\hat{c}_{ML}\)).
+
+The normal, pivotal, and percentile confidence intervals for \(\hat{c}_{ML}\) at the confidence level \(\gamma = 0.90\) are calculated using each method.
+
+For bootstrap, we generate \(B = 2000\) bootstrap samples. For Monte Carlo simulation, we generate \(M = 5000\) samples of size \(N = 100\) from the Pareto distribution.
+
+The results are as follows:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Method} & \textbf{Mean} & \textbf{Normal CI} & \textbf{Pivotal CI} & \textbf{Percentile CI} \\ \hline
+Parametric & \(10.2e^{-5}\) & \((9.4e^{-5}, 11.2e^{-5})\) & \((9.3e^{-5}, 11.2e^{-5})\) & \((9.4e^{-5}, 11.2e^{-5})\) \\ \hline
+Nonparametric & \(6.3e^{-5}\) & \((5.8e^{-5}, 6.8e^{-5})\) & \((5.8e^{-5}, 6.8e^{-5})\) & \((5.8e^{-5}, 6.8e^{-5})\) \\ \hline
+Monte Carlo & \(6.7e^{-5}\) & \((6.2e^{-5}, 7.1e^{-5})\) & \((6.2e^{-5}, 7.1e^{-5})\) & \((6.2e^{-5}, 7.1e^{-5})\) \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Discussion}
+
+All in all, the results show the following:
+
+\begin{itemize}
+    \item The normal, pivotal, and percentile confidence intervals are very similar in all configurations. There is no noticeable difference between the methods in this case.
+    \item Monte Carlo simulation was the most computationally expensive method, but it provides the most accurate results. For the mean, only the Monte Carlo simulation provides a confidence interval that includes the true mean.
+    \item Parametric and nonparametric bootstrap methods overestimated the variance of the sample mean. Parametric bootstrap also overestimated the variance of the maximum likelihood estimator of the parameter \(c\) of the Pareto distribution.
+\end{itemize}
+
+\section{Task 3: Nonparametric density estimation}
+
+% TODO
 
 \end{document}

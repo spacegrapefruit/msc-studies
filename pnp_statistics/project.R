@@ -1,9 +1,8 @@
-library(MASS)   # if needed, or we define our own MLE again
-library(MASS)         # for fitdistr (parametric MLE of Gamma)
-library(stats)        # for ks.test, etc.
+library(MASS)
+
 
 ##############################################################################
-# 3. Testing Goodness-of-Fit
+# 1. Testing Goodness-of-Fit
 ##############################################################################
 
 # task parameters
@@ -14,10 +13,10 @@ params <- list(
   I2 = 8
 )
 
-# Uniform distribution
+# uniform distribution
 theta0 <- c(-params$N, params$S + 4)
 
-# 1) Determine mu0 and v0^2 for G0
+# determine mu0 and v0^2 for G0
 a0  <- theta0[1]
 b0  <- theta0[2]
 mu0 <- (a0 + b0) / 2  # mean
@@ -50,10 +49,10 @@ b2 <- (a2b2_sum + a2b2_diff)/2
 theta2 <- c(a2, b2)
 cat("G2 = Unif(", a2, ",", b2, ")\n\n")
 
-# Define probabilities p1, p2
+# define probabilities p1, p2
 alpha1 <- 0.1
 alpha2 <- 0.01
-tau    <- 1/(1 + params$I1)  # I1 = 5 => tau = 1/6
+tau <- 1/(1 + params$I1)
 
 p1 <- alpha1^(1 - tau) * alpha2^tau
 p2 <- 5 * p1 / sqrt(params$S)  # S = 9 => sqrt(S) = 3 => p2 = 5*p1/3
@@ -61,15 +60,15 @@ p2 <- 5 * p1 / sqrt(params$S)  # S = 9 => sqrt(S) = 3 => p2 = 5*p1/3
 cat("p1 =", p1, "\n")
 cat("p2 =", p2, "\n\n")
 
-# Mixture: with probability p => Unif(a1,b1), else Unif(a0,b0)
+# mixture: with probability p => Unif(a1,b1), else Unif(a0,b0)
 rMixture <- function(n, p, a0, b0, a1, b1) {
-  # Vector of 0/1 for which component is chosen
+  # vector of 0/1 for which component is chosen
   comp <- rbinom(n, size=1, prob=p)
   x <- numeric(n)
   # generate from G0 or G1
   idx1 <- which(comp == 1)
   idx0 <- which(comp == 0)
-    # Random draw from Uniform(a,b)
+  # random draw from Uniform(a,b)
   x[idx1] <- runif(length(idx1), min=a1, max=b1)
   x[idx0] <- runif(length(idx0), min=a0, max=b0)
   return(x)
@@ -82,7 +81,7 @@ cat("Sample sizes:", n1, "and", n2, "\n\n")
 
 set.seed(1337)
 
-# Scenario A: data from (1 - p1)*G0 + p1*G1
+# G0 and G1
 xA_n1 <- rMixture(n1, p1, a0, b0, a1, b1)
 resA_n1 <- ks.test(xA_n1, "punif", min=a0, max=b0)$p.value
 
@@ -93,7 +92,7 @@ cat("Mixture (p1) results:\n")
 cat("n =", n1, ":\n"); print(resA_n1)
 cat("n =", n2, ":\n"); print(resA_n2)
 
-# Scenario B: data from (1 - p2)*G0 + p2*G2
+# G0 and G2
 xB_n1 <- rMixture(n1, p2, a0, b0, a2, b2)
 resB_n1 <- ks.test(xB_n1, "punif", min=a0, max=b0)$p.value
 
@@ -104,52 +103,43 @@ cat("Mixture (p2) results:\n")
 cat("n =", n1, ":\n"); print(resB_n1)
 cat("n =", n2, ":\n"); print(resB_n2)
 
+
 ##############################################################################
-# 4.1. Parametric Bootstrap for Testing Complex GoF Hypothesis
+# 2.1. Parametric bootstrap for testing complex GoF hypothesis
 ##############################################################################
 
-# MLE for Uniform distribution
-# For data y, MLE is (min(y), max(y)).
+# for uniform, MLE is (min(y), max(y))
 mle_uniform <- function(y) {
   c(min(y), max(y))
 }
 
-# Parametric Bootstrap Function
-# We test  H0: F_Y ∈ G(Θ)  vs.  H': F_Y ∉ G(Θ)
-# using a parametric bootstrap approach with a chosen GoF statistic T.
-
 parametric_bootstrap_test <- function(y, B, alpha=0.1) {
   n <- length(y)
 
-  # Step 2: Estimate parameter theta_N by MLE (or method of moments) for the Uniform family
-  thetaN <- mle_uniform(y)  # => (min(y), max(y))
+  thetaN <- mle_uniform(y)  # min(y), max(y)
   aN <- thetaN[1]
   bN <- thetaN[2]
 
-  # Compute T_N: GoF statistic comparing EDF of y to Unif(aN, bN)
+  # comparing EDF of y to unif(aN, bN)
   T_N <- ks.test(y, "punif", min=aN, max=bN)$statistic
 
-  # Step 3: Generate B bootstrap samples from G_N = Unif(aN, bN).
-  #         For each sample, re-estimate parameter -> compute T_(N,b)*.
   T_star <- numeric(B)
-  for (b in seq_len(B)) {
-    # Generate bootstrap sample
+  for (b in 1:B) {
+    # generate bootstrap sample
     y_star <- runif(n, min=aN, max=bN)
 
-    # Estimate parameter from y_star
+    # estimate parameter from y_star
     theta_star <- mle_uniform(y_star)
-    a_star     <- theta_star[1]
-    b_star     <- theta_star[2]
+    a_star <- theta_star[1]
+    b_star <- theta_star[2]
 
-    # Compute GoF statistic T_(N,b)* comparing y_star to Unif(a_star, b_star)
+    # compute T_(N,b)* comparing y_star to unif(a_star, b_star)
     T_star[b] <- ks.test(y_star, "punif", min=a_star, max=b_star)$statistic
   }
 
-  # Step 4: Approximate bootstrap p-value
-  #         p* = # { b : T_star[b] > T_N } / B
   p_star <- mean(T_star > T_N)
 
-  # Decide reject or not
+  # reject or not
   reject <- (p_star < alpha)
 
   list(T_N = T_N,
@@ -159,37 +149,34 @@ parametric_bootstrap_test <- function(y, B, alpha=0.1) {
        B = B)
 }
 
-# We'll do the same two scenarios for data generation as in Task 1:
-#   (A) (1 - p1)*G0 + p1*G1
-#   (B) (1 - p2)*G0 + p2*G2
-# and for two sample sizes n1, n2.
-
 set.seed(1337)
 
 alpha <- 0.1    # significance level
 
-# ---- Scenario A: data from (1 - p1)*G0 + p1*G1 ----
-cat("Scenario A: Y ~ (1 - p1)*Unif(a0,b0) + p1*Unif(a1,b1)\n")
+# G0 and G1
+cat("G0 and G1\n")
 for (n in c(n1, n2)) {
-  B_boot <- 100 * n     # number of bootstrap replications (should be large in practice)
-  # Generate data
+  B_boot <- 100 * n
+
+  # generate data
   yA <- rMixture(n, p1, a0, b0, a1, b1)
 
-  # Parametric bootstrap test
+  # parametric bootstrap test
   resA <- parametric_bootstrap_test(yA, B=B_boot, alpha=alpha)
 
   cat(sprintf(" n=%d, T_N=%.5f, p_boot=%.5f, rejectH0=%s\n",
               n, resA$T_N, resA$p_boot, resA$reject))
 }
 
-
-# ---- Scenario B: data from (1 - p2)*G0 + p2*G2 ----
-cat("Scenario B: Y ~ (1 - p2)*Unif(a0,b0) + p2*Unif(a2,b2)\n")
+# G0 and G2
+cat("G0 and G2\n")
 for (n in c(n1, n2)) {
-  # Generate data
+  B_boot <- 100 * n
+
+  # generate data
   yB <- rMixture(n, p2, a0, b0, a2, b2)
 
-  # Parametric bootstrap test
+  # parametric bootstrap test
   resB <- parametric_bootstrap_test(yB, B=B_boot, alpha=alpha)
 
   cat(sprintf(" n=%d, T_N=%.5f, p_boot=%.5f, rejectH0=%s\n",
@@ -198,36 +185,36 @@ for (n in c(n1, n2)) {
 
 
 ##############################################################################
-# 4.2.1. Checking Bootstrap Consistency for Gamma(0.5, 9), N=100
+# 2.2.1. Checking bootstrap consistency for Gamma(0.5, 9), N=100
 ##############################################################################
 
 set.seed(1337)
 
 N <- 100
-a.true <- 0.5   # shape
-b.true <- 9     # scale
-B.boot <- 2000  # number of bootstrap replications
+a_true <- 0.5   # shape
+b_true <- 9     # scale
+B_boot <- 2000  # number of bootstrap replications
 
 # generate data
-Y <- rgamma(N, shape=a.true, scale=b.true)
+Y <- rgamma(N, shape=a_true, scale=b_true)
 
 gamma_fit <- fitdistr(Y, densfun="gamma")  # shape, rate=1/scale
 
 # parametric bootstrap
-a.hat <- gamma_fit$estimate["shape"]
-b.hat <- 1/gamma_fit$estimate["rate"]  # scale = 1/rate
+a_hat <- gamma_fit$estimate["shape"]
+b_hat <- 1/gamma_fit$estimate["rate"]  # scale = 1/rate
 
-ybar_param_boot <- numeric(B.boot)
-for (b in seq_len(B.boot)) {
-  Ystar <- rgamma(N, shape=a.hat, scale=b.hat)
+ybar_param_boot <- numeric(B_boot)
+for (b in 1:B_boot) {
+  Ystar <- rgamma(N, shape=a_hat, scale=b_hat)
   ybar_param_boot[b] <- mean(Ystar)
 }
 
 # nonparametric bootstrap
-ybar_nonpar_boot <- numeric(B.boot)
-for (b in seq_len(B.boot)) {
+ybar_nparam_boot <- numeric(B_boot)
+for (b in 1:B_boot) {
   Ystar_np <- sample(Y, size=N, replace=TRUE)
-  ybar_nonpar_boot[b] <- mean(Ystar_np)
+  ybar_nparam_boot[b] <- mean(Ystar_np)
 }
 
 ks_distance_true <- function(x_sample, cdfF) {
@@ -243,230 +230,310 @@ cdf_mean_gamma <- function(x, shape, scale) {
   pgamma(x, shape=shape, scale=scale)
 }
 
-# ks_param <- ks_distance_true(
-#   ybar_param_boot,
-#   function(x) cdf_mean_gamma(x, shape=N*a.true, scale=b.true/N)
-# )
-
 cdfYbar_true <- function(x) {
-  cdf_mean_gamma(x, shape=N*a.true, scale=b.true/N)
+  cdf_mean_gamma(x, shape=N*a_true, scale=b_true/N)
 }
-ks_param <- ks.test(ybar_param_boot, cdfYbar_true)
+ks_param_stats <- ks.test(ybar_param_boot, cdfYbar_true)
 
-# Similarly for nonparam
-ks_nonpar <- ks.test(ybar_nonpar_boot, cdfYbar_true)
+# similarly for nonparam
+ks_nparam_stats <- ks.test(ybar_nparam_boot, cdfYbar_true)
 
-cat("Gamma(0.5, 9): Checking Y-bar distribution, N=100\n")
-cat("  KS stats (Param. Bootstrap)\n", ks_param$statistic, ks_param$p.value, "\n")
-cat("  KS stats (Nonparam. Bootstrap)\n", ks_nonpar$statistic, ks_nonpar$p.value, "\n")
+cat("Gamma(0.5, 9), N=100\n")
+cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
+cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
 
 ##############################################################################
-# 4.2.2. Checking Bootstrap Consistency for Pareto(c=9, d=0.5), N=100
+# 2.2.2. Checking bootstrap consistency for Pareto(c=9, d=0.5), N=100
 ##############################################################################
 
 set.seed(1337)
 
-# Large-scale Monte Carlo to approximate the true distribution of Y-bar
-# FIXME switched c, d around to be consistent with Gamma example
+# Monte Carlo to approximate true distribution
 N <- 100
-c.true <- 9
-d.true <- 0.5
-M.large <- 2e5  # large number for MC approximation (200k)
+c_true <- 9
+d_true <- 0.5
+M_large <- 2e5  # 200k for MC approximation
 
-# Pareto(c, d) random generator:
-#   PDF: f(x) = d * c^d / x^{d+1},  for x >= c
+# Pareto(c, d) random generator
 rpareto <- function(n, c, d) {
-  # Invert CDF method:
-  #   X = c * (1 - U)^{-1/d},  where U ~ Uniform(0,1)
   U <- runif(n)
-  c*( (1 - U)^(-1/d) )
+  c * ((1 - U)^(-1/d))
 }
 
-# generate M.large data blocks of size N each => or do a simpler approach:
-# We'll generate M.large draws, group them in blocks of size N to get means.
-# But that might be huge for memory if M.large*N is large. 
-# We'll do a smaller approach for demonstration. 
-# A more memory-friendly approach is to do repeated sums in a loop or with matrix.
+# generate matrix
+data_all <- rpareto(M_large, c=c_true, d=d_true)  # 2000 blocks
+mat_all <- matrix(data_all, nrow=2000, ncol=N)
+means_all <- rowMeans(mat_all)  # mean of each block
 
-# For demonstration, let's do it with a matrix approach:
-data_all <- rpareto(M.large, c=c.true, d=d.true)  # 2000 blocks
-mat_all  <- matrix(data_all, nrow=2000, ncol=N)
-means_all <- rowMeans(mat_all)
-# means_all is a sample of size 2000 from the distribution of Y-bar(=1/N sum_i Y_i).
+# from one sample of size N=100
+Y <- rpareto(N, c=c_true, d=d_true)
 
-# 2) From one actual sample of size N=100
-Y <- rpareto(N, c=c.true, d=d.true)
-
-# 3a) Parametric Bootstrap: fit Pareto
-# We'll do a quick MLE approach:
-#  - MLE for c is  c_ML = min(Y).
-#  - MLE for d is  solve for d from log-likelihood or we can do a numeric approach.
-
+# parametric bootstrap
 pareto_mle <- function(y) {
-  c.ml <- min(y)
-  # For d: solve \(\hat d = N / \sum_{i=1}^N \ln(Y_i/c.ml)\), assuming all Y_i >= c.ml
-  d.ml <- length(y) / sum(log(y/c.ml))
-  c(c.ml, d.ml)
+  c_ml <- min(y)
+  d_ml <- length(y) / sum(log(y/c_ml))
+  c(c_ml, d_ml)
 }
 
 mle_pareto <- pareto_mle(Y)
-c.hat <- mle_pareto[1]
-d.hat <- mle_pareto[2]
+c_hat <- mle_pareto[1]
+d_hat <- mle_pareto[2]
 
-# Param bootstrap draws of Y-bar
-B.boot <- 2000
-ybar_param <- numeric(B.boot)
-for (b in seq_len(B.boot)) {
-  Ystar <- rpareto(N, c.hat, d.hat)
+B_boot <- 2000
+ybar_param <- numeric(B_boot)
+for (b in 1:B_boot) {
+  Ystar <- rpareto(N, c_hat, d_hat)
   ybar_param[b] <- mean(Ystar)
 }
 
-# 3b) Nonparametric Bootstrap
-ybar_nonpar <- numeric(B.boot)
-for (b in seq_len(B.boot)) {
+# nonparametric bootstrap
+ybar_nparam <- numeric(B_boot)
+for (b in 1:B_boot) {
   Ystar_np <- sample(Y, size=N, replace=TRUE)
-  ybar_nonpar[b] <- mean(Ystar_np)
+  ybar_nparam[b] <- mean(Ystar_np)
 }
 
-# 4) Compare each to the "true" distribution ~ the distribution of Y-bar approximated by 'means_all'.
-# We can do a two-sample KS test:
+# compare each to true distribution
 ks_param_stats <- suppressWarnings(ks.test(ybar_param, means_all))
-ks_nonpar_stats <- suppressWarnings(ks.test(ybar_nonpar, means_all))
+ks_nparam_stats <- suppressWarnings(ks.test(ybar_nparam, means_all))
 
-cat("Pareto(c=9, d=0.5), checking distribution of Y-bar, N=100\n")
-cat("  KS stats (Param. Bootstrap)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
-cat("  KS stats (Nonparam. Bootstrap)\n", ks_nonpar_stats$statistic, ks_nonpar_stats$p.value, "\n")
+cat("Pareto(c=9, d=0.5), N=100\n")
+cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
+cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
 
 ##############################################################################
-# 4.3.1. Bootstrap Confidence Intervals for PARETO(c=9, d=11), N=100
+# 4.3.1. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(mean), N=100
 ##############################################################################
+
+# some utils
+# - t_hat: point estimate from the original sample
+# - t_boot: bootstrap replicates of estimate
+# - alpha: 1 - gamma
+ci_normal <- function(t_hat, t_boot, alpha = 0.1) {
+  z <- qnorm(1 - alpha/2)
+  sd_t <- sd(t_boot)
+  lower <- t_hat - z * sd_t
+  upper <- t_hat + z * sd_t
+  return(c(lower, upper))
+}
+
+ci_percentile <- function(t_boot, alpha = 0.1) {
+  lower <- quantile(t_boot, probs = alpha/2)
+  upper <- quantile(t_boot, probs = 1 - alpha/2)
+  return(c(lower, upper))
+}
+
+ci_pivotal <- function(t_hat, t_boot, alpha = 0.1) {
+  lower <- 2 * t_hat - quantile(t_boot, probs = 1 - alpha/2)
+  upper <- 2 * t_hat - quantile(t_boot, probs = alpha/2)
+  return(c(lower, upper))
+}
+
+# true variance of Pareto sample mean
+var_mean_pareto <- function(d, c, N) {
+  numerator <- c * d^2
+  denominator <- (c - 1)^2 * (c - 2)
+  return( numerator / denominator / N )
+}
 
 set.seed(1337)
 
-# 0) Setup
-N  <- 100
-c0 <- 9
-d0 <- 11
-gamma_level <- 0.90  # confidence level
-alpha_half  <- (1 - gamma_level)/2
+N <- 100       # sample size
+c_true <- 9         # scale param as per the task
+d_true <- 11        # shape param as per the task
+M_boot <- 2000      # number of bootstrap reps
+M_mc <- 5000      # number of direct Monte Carlo reps
+alpha <- 0.10      # significance level => gamma=0.90
 
-# True data
-Y <- rpareto(N, c=c0, d=d0)
 
-# 1) Parameter of interest #1: var( Y_bar )
-# We'll compute the sample mean, and want bootstrap intervals for that sample mean's variance.
-# (a) We can approximate the "true" variance if we know the distribution or do large MC from the true parameters.
+# generate
+y_sample <- rpareto(N, c_true, d_true)
 
-# For demonstration, let's do a direct MC approach to approximate var(Y_bar):
-nMC <- 50000
-mc_data <- matrix(rpareto(N*nMC, c0, d0), ncol=N)
-mc_means <- rowMeans(mc_data)
-true_var_ybar <- var(mc_means)
-cat(sprintf("Approx true var(Y_bar) from MC = %.4f\n", true_var_ybar))
+# sample mean
+ybar_hat <- mean(y_sample)
 
-# We'll do param. bootstrap & nonparam. bootstrap to estimate var(Y_bar).
-# Then we construct 90% CI for var(Y_bar) using:
-#   (1) Normal:     [ T.hat +- z_{alpha/2} * SE.boot ]
-#   (2) Percentile: [ q_{alpha/2}, q_{1-alpha/2} ] of the bootstrap distribution
-#   (3) Pivotal:    2*T.hat - [ q_{1-alpha/2}, q_{alpha/2} ]
+mle_pareto <- pareto_mle(y_sample)
+c_hat <- mle_pareto[1]
+d_hat <- mle_pareto[2]
 
-# 1a) Parametric bootstrap for var(Y_bar)
-mle_est <- pareto_mle(Y)
-c.hat <- mle_est[1]
-d.hat <- mle_est[2]
+# parametric bootstrap
+param_boot_vals <- numeric(M_boot)
 
-B.boot <- 2000
-varYbar_star <- numeric(B.boot)
-# For each bootstrap sample:
-for (b in 1:B.boot) {
-  Ystar <- rpareto(N, c.hat, d.hat)
-  varYbar_star[b] <- var(mean(Ystar))  # i.e. 0, actually we want the distribution of mean(Ystar),
-  # but for 'variance' we do a 2-level approach:
-  # We want the "variance of Y_bar" as if many such replicate samples. 
-  # To estimate that from 1 bootstrap sample is incomplete. Instead we do the "plug-in" approach:
-  #   1) compute the sample mean, store it. Then at the end we see var(boot_means).
-  # Alternatively, we do a 2-level nested bootstrap. But let's do the simpler route:
-  # We'll store the "bootstrap replicate" of Y_bar:
-  varYbar_star[b] <- mean(Ystar)  # store Y_bar itself, not its variance from that single replicate
+for (b in 1:M_boot) {
+  yb <- rpareto(N, c_hat, d_hat)
+  # sample mean
+  param_boot_vals[b] <- mean(yb)
 }
-# Now the sample variance of the B.boot "mean(Ystar)" is the bootstrap estimate of var(Y_bar).
-boot_means_param <- varYbar_star
-T_hat_param <- mean(Y)  # the observed Y_bar
-varhat_param <- var(boot_means_param)  # "bootstrap estimate" of var(Y_bar)
 
-# We'll treat var(boot_means_param) as the point estimate for var(Y_bar).
-# Next we want the distribution of 'var(Y_bar*)' across bootstrap replicates for constructing intervals.
-# Actually for "Normal" CI for var(Y_bar)", we might do:
-#   T.hat = varhat_param,  SE = sd( [var(Y_bar*)] ) ? 
-# There's a conceptual subtlety here: we want the distribution of 'var( Y_bar )' as a single parameter, 
-# so we want to do repeated param. bootstrap at a second level or do a direct formula. 
-#
-# For demonstration, let's produce a simpler "Percentile" approach for var(Y_bar):
-# We'll do a single-level approach: each replicate we re-draw a sample of size N, compute Y_bar*, 
-# then compute var(Y_bar*) across the B=2000. The distribution of these sample means is the estimate 
-# of the distribution of Y_bar. The variance of that distribution is our "point estimate." 
-# We can also get quantiles of that "variance" via repeated draws from the main loop (but that is 2-level). 
-# In short, for illustration, let's define:
+var_hat_param <- var(param_boot_vals)
 
-# "Normal" CI for var(Y_bar):
-SE_boot_param <- sd(boot_means_param) / sqrt(1)  # not standard usage, but demonstration
-Z <- qnorm(1 - alpha_half)
-
-varYbar_param_est <- varhat_param  # central estimate
-ci_normal_param <- c(
-  varYbar_param_est - Z*SE_boot_param,
-  varYbar_param_est + Z*SE_boot_param
-)
-
-# "Percentile" CI for var(Y_bar):
-# We'll get the distribution of possible var(Y_bar) by re-sampling from the B replicates. 
-# In a more rigorous approach, we'd do a nested bootstrap. For brevity, let's do the "empirical var" approach:
-varboot_dist_param <- numeric(B.boot)
-for (b in 1:B.boot) {
-  # sub-resample of size N from param. model:
-  Ystar <- rpareto(N, c.hat, d.hat)
-  # now replicate that many times to approximate var( Y_bar )? 
-  # We skip the heavy nested approach. We'll do a smaller approach with e.g. 30 sub-samples:
-  # (this is quite compute-heavy in practice, so we do fewer sub-samples for demonstration).
-  ns_sub <- 30
-  means_sub <- numeric(ns_sub)
-  for (j in 1:ns_sub) {
-    Ysub <- rpareto(N, c.hat, d.hat)
-    means_sub[j] <- mean(Ysub)
-  }
-  varboot_dist_param[b] <- var(means_sub)
+varhat_boot_param <- numeric(M_boot)
+for (b in 1:M_boot) {
+  # re-sample from the param_boot_vals with replacement:
+  subvals <- sample(param_boot_vals, replace=TRUE, size=length(param_boot_vals))
+  varhat_boot_param[b] <- var(subvals)
 }
-ci_percentile_param <- quantile(varboot_dist_param, probs=c(alpha_half, 1-alpha_half))
 
-# "Pivotal" / "Basic" CI is in principle:
-#  [2*varYbar_param_est - q_{1-alpha_half},  2*varYbar_param_est - q_{alpha_half} ]
-# again referencing varboot_dist_param. We'll skip full details here for brevity.
+# varhat_boot_param is a bootstrap distribution var_hat_param
+T_hat_param <- mean(varhat_boot_param)
+T_boot_param <- varhat_boot_param
 
-cat("\n--- Param Bootstrap CI for var(Y_bar), Pareto(9,11) ---\n")
-cat("Estimate of var(Y_bar) by param bootstrap:", varYbar_param_est, "\n")
-cat("Normal approx CI:", ci_normal_param, "\n")
-cat("Percentile CI:", ci_percentile_param, "\n")
+ci_param_normal <- ci_normal(T_hat_param, T_boot_param, alpha)
+ci_param_percentile <- ci_percentile(T_boot_param, alpha)
+ci_param_pivotal <- ci_pivotal(T_hat_param, T_boot_param, alpha)
 
-# 1b) Nonparametric bootstrap for var(Y_bar)
-boot_means_nonpar <- numeric(B.boot)
-for (b in 1:B.boot) {
-  idx <- sample(seq_len(N), N, replace=TRUE)
-  Ystar_np <- Y[idx]
-  boot_means_nonpar[b] <- mean(Ystar_np)
+# nonparametric bootstrap
+nparam_boot_vals <- numeric(M_boot)
+for (b in 1:M_boot) {
+  # sample with replacement from original data
+  yb <- sample(y_sample, replace=TRUE, size=N)
+  # statistic = sample mean
+  nparam_boot_vals[b] <- mean(yb)
 }
-varhat_nonpar <- var(boot_means_nonpar)
+var_hat_nparam <- var(nparam_boot_vals)
 
-cat("\n--- Nonparam Bootstrap estimate of var(Y_bar) ---\n")
-cat("varhat_nonpar =", varhat_nonpar, "\n")
+# nested approach for the CI on var_hat_nparam
+varhat_boot_nparam <- numeric(M_boot)
+for (b in 1:M_boot) {
+  subvals <- sample(nparam_boot_vals, replace=TRUE, size=length(nparam_boot_vals))
+  varhat_boot_nparam[b] <- var(subvals)
+}
 
-# Similarly, we can create Normal/Percentile intervals for the nonparam. approach.
+T_hat_nparam  <- mean(varhat_boot_nparam)
+T_boot_nparam <- varhat_boot_nparam
 
-# 2) Parameter of interest #2: var( c_ML ) = var( min(Y) )
-# The procedure is similar: each bootstrap replicate => compute c_ML*, collect the distribution.
-# Then form confidence intervals for var( c_ML ). We omit the full code due to length, 
-# but it's analogous: each replicate yields c_ML*, then examine var(c_ML*) across replicates, 
-# then normal/pivotal/percentile intervals.
+ci_nparam_normal <- ci_normal(T_hat_nparam, T_boot_nparam, alpha)
+ci_nparam_percentile <- ci_percentile(T_boot_nparam, alpha)
+ci_nparam_pivotal <- ci_pivotal(T_hat_nparam, T_boot_nparam, alpha)
 
-cat("\n(See code comments for details on variance of c_ML as well.)\n")
+# direct Monte Carlo
+mc_vals <- numeric(M_mc)
+for (m in 1:M_mc) {
+  ym <- rpareto(N, c_true, d_true)
+  mc_vals[m] <- mean(ym)
+}
+var_hat_mc <- var(mc_vals)  # direct MC estimate
+
+# CI by bootstrap of MC sample
+varhat_boot_mc <- numeric(M_boot)
+for (b in 1:M_boot) {
+  subvals <- sample(mc_vals, replace=TRUE, size=length(mc_vals))
+  varhat_boot_mc[b] <- var(subvals)
+}
+
+T_hat_mc  <- mean(varhat_boot_mc)
+T_boot_mc <- varhat_boot_mc
+
+ci_mc_normal <- ci_normal(T_hat_mc, T_boot_mc, alpha)
+ci_mc_percentile <- ci_percentile(T_boot_mc, alpha)
+ci_mc_pivotal <- ci_pivotal(T_hat_mc, T_boot_mc, alpha)
+
+# compare all CIs and the true value
+true_var_mean <- var_mean_pareto(c_true, d_true, N = N)
+
+cat("Task A: var(mean(Y)) results\n")
+cat("True value =", true_var_mean, "\n\n")
+
+cat("Parametric bootstrap:", round(T_hat_param, 5), "\n")
+cat("   Normal CI     =", round(ci_param_normal, 5), "\n")
+cat("   Percentile CI =", round(ci_param_percentile, 5), "\n")
+cat("   Pivotal CI    =", round(ci_param_pivotal, 5), "\n\n")
+
+cat("Nonparametric bootstrap:", round(T_hat_nparam, 5), "\n")
+cat("   Normal CI     =", round(ci_nparam_normal, 5), "\n")
+cat("   Percentile CI =", round(ci_nparam_percentile, 5), "\n")
+cat("   Pivotal CI    =", round(ci_nparam_pivotal, 5), "\n\n")
+
+cat("Direct MC:", round(T_hat_mc, 5), "\n")
+cat("   Normal CI     =", round(ci_mc_normal, 5), "\n")
+cat("   Percentile CI =", round(ci_mc_percentile, 5), "\n")
+cat("   Pivotal CI    =", round(ci_mc_pivotal, 5), "\n")
+
+
+##############################################################################
+# 4.3.2. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(Y_(1)), N=100
+##############################################################################
+
+# we repeat analogous steps, but now the statistic is Y_(1), the minimum of the sample
+
+# parametric bootstrap
+param_boot_cML <- numeric(M_boot)
+for (b in 1:M_boot) {
+  yb <- rpareto(N, c_hat, d_hat)
+  param_boot_cML[b] <- min(yb)
+}
+# best point estimate for var(Y_(1)) from param bootstrap is var(param_boot_cML)
+var_cML_param <- var(param_boot_cML)
+
+varcML_boot_param <- numeric(M_boot)
+for (b in 1:M_boot) {
+  subvals <- sample(param_boot_cML, replace=TRUE, size=length(param_boot_cML))
+  varcML_boot_param[b] <- var(subvals)
+}
+T_hat_cML_param  <- mean(varcML_boot_param)
+T_boot_cML_param <- varcML_boot_param
+
+ci_param_cML_normal <- ci_normal(T_hat_cML_param, T_boot_cML_param, alpha)
+ci_param_cML_percentile <- ci_percentile(T_boot_cML_param, alpha)
+ci_param_cML_pivotal <- ci_pivotal(T_hat_cML_param, T_boot_cML_param, alpha)
+
+# nonparametric bootstrap
+nparam_boot_cML <- numeric(M_boot)
+for (b in 1:M_boot) {
+  yb <- sample(y_sample, replace=TRUE, size=N)
+  nparam_boot_cML[b] <- min(yb)
+}
+var_cML_nparam <- var(nparam_boot_cML)
+
+varcML_boot_nparam <- numeric(M_boot)
+for (b in 1:M_boot) {
+  subvals <- sample(nparam_boot_cML, replace=TRUE, size=length(nparam_boot_cML))
+  varcML_boot_nparam[b] <- var(subvals)
+}
+T_hat_cML_nparam  <- mean(varcML_boot_nparam)
+T_boot_cML_nparam <- varcML_boot_nparam
+
+ci_nparam_cML_normal <- ci_normal(T_hat_cML_nparam, T_boot_cML_nparam, alpha)
+ci_nparam_cML_percentile <- ci_percentile(T_boot_cML_nparam, alpha)
+ci_nparam_cML_pivotal <- ci_pivotal(T_hat_cML_nparam, T_boot_cML_nparam, alpha)
+
+
+# direct Monte Carlo
+mc_cML <- numeric(M_mc)
+for (m in 1:M_mc) {
+  ym <- rpareto(N, c_true, d_true)
+  mc_cML[m] <- min(ym)
+}
+var_cML_mc <- var(mc_cML)
+
+varcML_boot_mc <- numeric(M_boot)
+for (b in 1:M_boot) {
+  subvals <- sample(mc_cML, replace=TRUE, size=length(mc_cML))
+  varcML_boot_mc[b] <- var(subvals)
+}
+T_hat_cML_mc <- mean(varcML_boot_mc)
+T_boot_cML_mc <- varcML_boot_mc
+
+ci_mc_cML_normal <- ci_normal(T_hat_cML_mc, T_boot_cML_mc, alpha)
+ci_mc_cML_percentile <- ci_percentile(T_boot_cML_mc, alpha)
+ci_mc_cML_pivotal <- ci_pivotal(T_hat_cML_mc, T_boot_cML_mc, alpha)
+
+
+cat("Task B: var(Y_(1)) results\n")
+
+cat("Parametric bootstrap:", round(T_hat_cML_param, 7), "\n")
+cat("   Normal CI     =", round(ci_param_cML_normal, 7), "\n")
+cat("   Percentile CI =", round(ci_param_cML_percentile, 7), "\n")
+cat("   Pivotal CI    =", round(ci_param_cML_pivotal, 7), "\n\n")
+
+cat("Nonparametric bootstrap:", round(T_hat_cML_nparam, 7), "\n")
+cat("   Normal CI     =", round(ci_nparam_cML_normal, 7), "\n")
+cat("   Percentile CI =", round(ci_nparam_cML_percentile, 7), "\n")
+cat("   Pivotal CI    =", round(ci_nparam_cML_pivotal, 7), "\n\n")
+
+cat("Direct MC:", round(T_hat_cML_mc, 7), "\n")
+cat("   Normal CI     =", round(ci_mc_cML_normal, 7), "\n")
+cat("   Percentile CI =", round(ci_mc_cML_percentile, 7), "\n")
+cat("   Pivotal CI    =", round(ci_mc_cML_pivotal, 7), "\n")
