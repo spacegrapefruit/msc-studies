@@ -1,6 +1,8 @@
 library(FNN)
 library(kedd)
 library(MASS)
+library(EnvStats)
+library(stats)
 
 
 ##############################################################################
@@ -244,6 +246,21 @@ cat("Gamma(0.5, 9), N=100\n")
 cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
 cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
+# plot the bootstrap distributions
+png("gamma_bootstrap_distributions.png", width = 1000, height = 600)
+
+# not histogram, but density plot
+plot(density(ybar_param_boot, bw=0.07), col="red", lwd=2, xlab="Ybar", ylab="Density", main="", ylim=c(0, 0.65))
+lines(density(ybar_nparam_boot, bw=0.07), col="blue", lwd=2, main="")
+# add true value
+x <- seq(2, 8, length.out=1000)
+lines(x, dgamma(x, shape=N*a_true, scale=b_true/N), col="black", lwd=2)
+
+legend("topright", legend=c("Parametric", "Nonparametric", "True"),
+       col=c("red", "blue", "black"), lty=1, lwd=2)
+
+dev.off()
+
 
 ##############################################################################
 # 2.2.2. Checking bootstrap consistency for Pareto(c=9, d=0.5), N=100
@@ -257,19 +274,19 @@ c_true <- 9
 d_true <- 0.5
 M_large <- 2e5  # 200k for MC approximation
 
-# Pareto(c, d) random generator
-rpareto <- function(n, c, d) {
-  U <- runif(n)
-  c * ((1 - U)^(-1/d))
-}
+# # Pareto(c, d) random generator
+# rpareto <- function(n, c, d) {
+#   U <- runif(n)
+#   c * ((1 - U)^(-1/d))
+# }
 
 # generate matrix
-data_all <- rpareto(M_large, c=c_true, d=d_true)  # 2000 blocks
+data_all <- rpareto(M_large, location=c_true, shape=d_true)  # 2000 blocks
 mat_all <- matrix(data_all, nrow=2000, ncol=N)
 means_all <- rowMeans(mat_all)  # mean of each block
 
 # from one sample of size N=100
-Y <- rpareto(N, c=c_true, d=d_true)
+Y <- rpareto(N, location=c_true, shape=d_true)
 
 # parametric bootstrap
 pareto_mle <- function(y) {
@@ -285,7 +302,7 @@ d_hat <- mle_pareto[2]
 B_boot <- 2000
 ybar_param <- numeric(B_boot)
 for (b in 1:B_boot) {
-  Ystar <- rpareto(N, c_hat, d_hat)
+  Ystar <- rpareto(N, location=c_hat, shape=d_hat)
   ybar_param[b] <- mean(Ystar)
 }
 
@@ -304,9 +321,24 @@ cat("Pareto(c=9, d=0.5), N=100\n")
 cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
 cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
+# plot the bootstrap distributions
+png("pareto_bootstrap_distributions.png", width = 1000, height = 600)
+
+# not histogram, but density plot
+plot(density(ybar_param, bw=100, from=0, to=50000), col="red", lwd=2, xlab="Ybar", ylab="Density", xlim=c(0, 50000), ylim=c(0, 0.001), main="")
+lines(density(ybar_nparam, bw=1), col="blue", lwd=2, main="")
+# add true value
+x <- seq(0, 50000)
+lines(x, dpareto(x, location=c_true, shape=d_true), col="black", lwd=2)
+
+legend("topright", legend=c("Parametric", "Nonparametric", "True"),
+       col=c("red", "blue", "black"), lty=1, lwd=2)
+
+dev.off()
+
 
 ##############################################################################
-# 4.3.1. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(mean), N=100
+# 2.3.1. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(mean), N=100
 ##############################################################################
 
 # some utils
@@ -455,7 +487,7 @@ cat("   Pivotal CI    =", round(ci_mc_pivotal, 5), "\n")
 
 
 ##############################################################################
-# 4.3.2. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(Y_(1)), N=100
+# 2.3.2. Bootstrap Confidence Intervals for PARETO(c=9, d=11) var(Y_(1)), N=100
 ##############################################################################
 
 # we repeat analogous steps, but now the statistic is Y_(1), the minimum of the sample
@@ -544,8 +576,6 @@ cat("   Pivotal CI    =", round(ci_mc_cML_pivotal, 7), "\n")
 ##############################################################################
 # 3. Nonparametric density estimation
 ##############################################################################
-
-# library(stats)
 
 set.seed(1337)
 

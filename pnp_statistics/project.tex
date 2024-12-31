@@ -15,10 +15,6 @@
 
 \maketitle
 
-\section{Introduction}
-
-
-
 \section{Preliminaries}
 
 In the project below, we will use the following parameters:
@@ -475,7 +471,7 @@ The parametric bootstrap algorithm for testing this hypothesis is as follows:
 
 \subsubsection{Simulation Results}
 
-We will now simulate the parametric bootstrap procedure for the two sample sizes \(N_1 = 110\) and \(N_2 = 1100\). We will generate \(B = 100 \times N\) bootstrap samples and calculate the p-values for each sample.
+We simulate the parametric bootstrap procedure for the two sample sizes \(N_1 = 110\) and \(N_2 = 1100\). We have generated \(B = 100 \times N\) bootstrap samples and calculate the p-values for each sample.
 
 \begin{table}[h]
 \centering
@@ -503,13 +499,13 @@ In this case, the discrepancy related to \(G_1\) can be explained by the followi
 
 \begin{itemize}
     \item We are using Kolmogorov-Smirnov tests. This statistic is sensitive to the maximum deviation between the empirical distribution function and the fitted distribution.
-    \item Since \(p_1\) and \(p_2\) are small, the mixture distributions are close to the basic distribution \(G_0\), the estimated Kolmogorov-Smirnov test statistics are low and the associated p-values are high.
-    \item In Task~2, we do not know the parameter a priori. The maximum likelihood estimator is used to estimate \(\theta\) from the data, and the estimated values have a significantly wider range than the basic distribution. This leads to higher test statistics and lower p-values in the \(G_1\) mixture.
+    \item Since \(p_1\) and \(p_2\) are small, in Task~1 the mixture distributions were close to the basic distribution \(G_0\), the estimated Kolmogorov-Smirnov test statistics were low and the associated p-values are high.
+    \item In Task~2, we do not know the distribution parameters a priori. The maximum likelihood estimator is used to estimate \(\theta\) from the data, and the estimated values have a significantly wider range than the basic distribution. This leads to higher Kolmogorov-Smirnov test statistics and lower p-values in the \(G_1\) mixture.
 \end{itemize}
 
 Tests on the mixture with \(G_2\) are consistent between Task~1 and Task~2. The range of the parameter \(\theta\) is narrower for \(G_2\) than for \(G_1\), and the estimated distribution is closer to the basic distribution \(G_0\). This leads to lower test statistics and higher p-values in the \(G_2\) mixture. More samples are needed to detect the deviation a simple uniform distribution.
 
-If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the parametric bootstrap can be used to test whether the data fits the parametric family. Nonparametric bootstrap can be used when the parametric family cannot be assumed. The nonparametric bootstrap procedure is similar to the parametric bootstrap, but the parameter \(\theta\) is not estimated, and the bootstrap samples are sampled from the empirical distribution function. While the parametric bootstrap is more powerful when the parametric family is correct, the nonparametric bootstrap makes fewer assumptions and is more robust.
+If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the parametric bootstrap can be used to test whether the data fits the parametric family. Nonparametric bootstrap can be used when the parametric family cannot be assumed. The nonparametric bootstrap procedure is similar to the parametric bootstrap, but the parameter \(\theta\) is not estimated, and the bootstrap samples are sampled from the empirical distribution function. While the parametric bootstrap is more powerful when the parametric family is correct, the nonparametric bootstrap makes fewer assumptions and is more robust to model misspecification.
 
 \subsection{Checking Bootstrap Consistency}
 
@@ -546,7 +542,16 @@ We will generate a sample of size \(N = 100\) from the Gamma distribution with \
 
 We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
-The results are as follows:
+The resulting density functions are displayed in Figure~\ref{fig:gamma_bootstrap}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{gamma_bootstrap_distributions.png}
+\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Gamma distribution.}
+\label{fig:gamma_bootstrap}
+\end{figure}
+
+The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distributions are as follows:
 
 \begin{table}[h]
 \centering
@@ -570,7 +575,16 @@ We will generate a sample of size \(N = 100\) from \(F_2\) and compare the true 
 
 We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
-The results are as follows:
+The resulting density functions are displayed in Figure~\ref{fig:pareto_bootstrap}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{pareto_bootstrap_distributions.png}
+\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Pareto distribution.}
+\label{fig:pareto_bootstrap}
+\end{figure}
+
+The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distributions are as follows:
 
 \begin{table}[h]
 \centering
@@ -589,9 +603,12 @@ All of the results are significant at the \(\alpha = 0.1\) level. We have reject
 The results of the consistency checks for the sample mean \(\overline{Y}_N\) are as follows:
 
 \begin{itemize}
-    \item Both the parametric and nonparametric bootstrap procedures produced surprisingly very high Kolmogorov-Smirnov distances for both distributions. This indicates how our sample size \(N = 100\) is not large enough to accurately estimate the distribution of the sample mean \(\overline{Y}_N\), and the bootstrap procedure cannot approximate the true distribution well.
-    \item The parametric bootstrap procedure is closer than the nonparametric bootstrap procedure for both distributions. This is expected since the parametric bootstrap uses knowledge of the true distribution to generate bootstrap samples, while the nonparametric bootstrap does not.
-    \item In order to properly estimate the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\), we would need a larger sample size. The sample size \(N = 100\) is not sufficient to accurately estimate the distribution of the sample mean.
+  \item The variance of \(\overline{Y}_N\) seems to have been estimated correctly, but the mean is not. This is likely due to the sample size being too small to accurately estimate the distribution of the sample mean.
+  \item Both the parametric and nonparametric bootstrap procedures produced surprisingly very high Kolmogorov-Smirnov distances for both distributions. This indicates how our sample size \(N = 100\) is not large enough to accurately estimate the distribution of the sample mean \(\overline{Y}_N\), and the bootstrap procedure cannot approximate the true distribution well.
+  \item The parametric bootstrap distribution is closer than the nonparametric bootstrap for both distributions. This is expected since the parametric bootstrap uses (correct!) knowledge of the true distribution to generate bootstrap samples, while the nonparametric bootstrap does not.
+  \item Both bootstrap procedures underestimated and `flattened' the `peak' of the Pareto distribution at x = 0.
+  \item Parametric bootstrap produced a correct shape for the Pareto distribution, but the non-parametric bootstrap produced `spikes' at specific discrete values, which coincide with the original sample values.
+  \item In order to properly estimate the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\), we would need a larger sample size. The sample size \(N = 100\) is not sufficient to accurately estimate the distribution of the sample mean.
 \end{itemize}
 
 \subsection{Bootstrap Confidence Intervals}
@@ -646,9 +663,10 @@ Monte Carlo & \(6.7e^{-5}\) & \((6.2e^{-5}, 7.1e^{-5})\) & \((6.2e^{-5}, 7.1e^{-
 All in all, the results show the following:
 
 \begin{itemize}
-    \item The normal, pivotal, and percentile confidence intervals are very similar in all configurations. There is no noticeable difference between the methods in this case.
+    \item The normal, pivotal, and percentile confidence intervals are very similar in all configurations. There is no noticeable difference between the methods in these cases.
     \item Monte Carlo simulation was the most computationally expensive method, but it provides the most accurate results. For the mean, only the Monte Carlo simulation provides a confidence interval that includes the true mean.
     \item Parametric and nonparametric bootstrap methods overestimated the variance of the sample mean. Parametric bootstrap also overestimated the variance of the maximum likelihood estimator of the parameter \(c\) of the Pareto distribution.
+    \item Strangely, nonparametric bootstrap's confidence intervals for Pareto distribution's \(\hat{c}_{ML}\) are closer to Monte Carlo simulation than the parametric bootstrap's. It would be interesting to run more simulations to see if this is consistent.
 \end{itemize}
 
 \section{Task 3: Nonparametric density estimation}
@@ -720,6 +738,7 @@ The results of the density estimation are as follows:
   \item The Refined Plug-In method is also accurate, but slightly less so than LSCV. It is smoother than the LSCV method, but it is visibly less accurate in regions of sharp change in the density.
   \item The \(k\)-Nearest Neighbor method is about as accurate as Refined Plug-In, but it is significantly less smooth. Additionally, it estimates the highest density outside the range of the true density.
   \item The Smoothed Bootstrap method captures the general shape of the density, but it is significantly less accurate than the other methods. It is also less smooth and not as accurate in regions of sharp change in the density.
+  \item Overall, the results show that bandwidth-selection strategies can have different performance, with LSCV proving the most precise in this case.
 \end{itemize}
 
 \end{document}
