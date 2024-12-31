@@ -1,3 +1,5 @@
+library(FNN)
+library(kedd)
 library(MASS)
 
 
@@ -537,3 +539,203 @@ cat("Direct MC:", round(T_hat_cML_mc, 7), "\n")
 cat("   Normal CI     =", round(ci_mc_cML_normal, 7), "\n")
 cat("   Percentile CI =", round(ci_mc_cML_percentile, 7), "\n")
 cat("   Pivotal CI    =", round(ci_mc_cML_pivotal, 7), "\n")
+
+
+##############################################################################
+# 3. Nonparametric density estimation
+##############################################################################
+
+# library(stats)
+
+set.seed(1337)
+
+# mixture weights:
+pi0 <- 15/33
+pi1 <- 9/33
+pi2 <- 9/33
+
+# uniform distributions:
+# G0 ~ Uniform(-9, 13)
+# G1 ~ Uniform(-31, 35)
+# G2 ~ Uniform(11.0351, 18.3685)
+a0 <- -9;      b0 <- 13
+a1 <- -31;     b1 <- 35
+a2 <- 11.0351; b2 <- 18.3685
+
+# densities
+g0 <- function(u) {
+  out <- ifelse(u >= a0 & u <= b0, 1/(b0 - a0), 0)
+  return(out)
+}
+
+g1 <- function(u) {
+  out <- ifelse(u >= a1 & u <= b1, 1/(b1 - a1), 0)
+  return(out)
+}
+
+g2 <- function(u) {
+  out <- ifelse(u >= a2 & u <= b2, 1/(b2 - a2), 0)
+  return(out)
+}
+
+# mixture density g(u) = pi0*g0(u) + pi1*g1(u) + pi2*g2(u)
+g_true <- function(u) {
+  pi0 * g0(u) + pi1 * g1(u) + pi2 * g2(u)
+}
+
+# simulate data from the mixture
+simulate_mixture <- function(n) {
+  # draw uniform(0,1) to decide the mixture component
+  u <- runif(n)
+  x <- numeric(n)
+
+  for (i in 1:n) {
+    if (u[i] < pi0) {
+      # G0
+      x[i] <- runif(1, min = a0, max = b0)
+    } else if (u[i] < pi0 + pi1) {
+      # G1
+      x[i] <- runif(1, min = a1, max = b1)
+    } else {
+      # G2
+      x[i] <- runif(1, min = a2, max = b2)
+    }
+  }
+  return(x)
+}
+
+# generate
+n <- 2000
+x <- simulate_mixture(n)
+
+# estimate using different methods
+
+# create a grid of points to evaluate the estimated densities
+u_seq <- seq(min(x) - 5, max(x) + 5, length.out = 1000)
+
+# Least-Squares Cross-Validation -> bw.ucv
+bw_lscv  <- bw.ucv(x)
+kd_lscv  <- density(x, bw = bw_lscv, from = min(u_seq), to = max(u_seq), n = length(u_seq))
+
+# Refined Plug-In -> bw.SJ
+bw_sj <- bw.SJ(x)
+kd_sj <- density(x, bw = bw_sj, from = min(u_seq), to = max(u_seq), n = length(u_seq))
+
+# Smoothed Bootstrap for Bandwidth Selection
+smoothed_bootstrap_bw <- function(data, kernel = "gaussian", B = 100) {
+  base_bw <- bw.nrd0(data)
+
+  n <- length(data)
+  bootstrap_bandwidths <- numeric(B)
+  
+  for (b in 1:B) {
+    bootstrap_sample <- sample(data, n, replace = TRUE)
+
+    noise <- rnorm(n, mean = 0, sd = base_bw / sqrt(2))
+    smoothed_sample <- bootstrap_sample + noise
+    
+    bootstrap_bandwidths[b] <- bw.nrd0(smoothed_sample)
+  }
+  
+  optimal_bw <- mean(bootstrap_bandwidths)
+  return(optimal_bw)
+}
+
+bw_boot <- smoothed_bootstrap_bw(x, kernel = "gaussian", B = 100)
+kd_boot <- density(x, bw = bw_boot, from = min(u_seq), to = max(u_seq), n = length(u_seq))
+
+# kNN Density Estimation
+knn_density <- function(x, data, k) {
+  n <- length(data)
+  
+  knn_distances <- get.knnx(
+    data = matrix(data, ncol = 1), 
+    query = matrix(x, ncol = 1), 
+    k = k)$nn.dist[, k]
+  
+  densities <- k / (n * (2 * knn_distances))
+  return(densities)
+}
+
+knn_est <- knn_density(u_seq, x, k = 50)
+
+# evaluate and compare the estimated densities
+# also compute the true density values
+true_vals <- g_true(u_seq)
+
+# estimated densities
+lscv_vals <- kd_lscv$y
+sj_vals <- kd_sj$y
+boot_vals <- kd_boot$y
+knn_vals <- knn_est
+
+png("density_estimation_comparison_p1.png", width = 1000, height = 600)
+
+# plot comparison
+plot(u_seq, true_vals, type = "l", lwd = 2, col = "black",
+     xlab = "u", ylab = "Density",
+     ylim = c(0, max(c(true_vals, lscv_vals, sj_vals)) * 1.2))
+
+lines(kd_lscv$x, lscv_vals, col = "red", lwd = 2, lty = 2)
+lines(kd_sj$x, sj_vals, col = "blue", lwd = 2, lty = 3)
+
+legend(
+  "topright", 
+  legend = c(
+    "True Density", 
+    paste0("LSCV (bw=", round(bw_lscv,3),")"), 
+    paste0("Refined Plug-In (bw=", round(bw_sj,3),")")
+  ),
+  col = c("black", "red", "blue"),
+  lty = c(1, 2, 3),
+  lwd = 2,
+  bty = "n"
+)
+
+dev.off()
+
+png("density_estimation_comparison_p2.png", width = 1000, height = 600)
+
+# plot comparison
+plot(u_seq, true_vals, type = "l", lwd = 2, col = "black",
+     xlab = "u", ylab = "Density",
+     ylim = c(0, max(c(true_vals, boot_vals, knn_vals)) * 1.2))
+
+lines(kd_boot$x,  boot_vals, col = "green", lwd = 2, lty = 4)
+lines(u_seq, knn_vals, col = "purple", lwd = 2, lty = 5)
+
+legend(
+  "topright", 
+  legend = c(
+    "True Density", 
+    paste0("Smoothed Bootstrap (bw=", round(bw_boot,3),")"),
+    paste0("k-NN (k=", k_val,")")
+  ),
+  col = c("black", "green", "purple"),
+  lty = c(1, 4, 5),
+  lwd = 2,
+  bty = "n"
+)
+
+dev.off()
+
+# integrated squared error for each estimator
+
+# copied from google but this works
+trap_rule <- function(x, y) {
+  # approximate integral of y wrt x via trapezoidal rule
+  # x, y must be same length
+  nx <- length(x)
+  sum( (x[2:nx] - x[1:(nx-1)]) * (y[2:nx] + y[1:(nx-1)]) )/2
+}
+
+# for each estimator, compute \int (g_hat(u) - g(u))^2 du
+mse_lscv <- trap_rule(u_seq, (lscv_vals - true_vals)^2)
+mse_sj   <- trap_rule(u_seq, (sj_vals   - true_vals)^2)
+mse_boot <- trap_rule(u_seq, (boot_vals - true_vals)^2)
+mse_knn  <- trap_rule(u_seq, (knn_vals  - true_vals)^2)
+
+cat("Approx. ISE (LSCV)  =", mse_lscv, "\n")
+cat("Approx. ISE (SJ)    =", mse_sj,   "\n")
+cat("Approx. ISE (BOOT)  =", mse_boot, "\n")
+cat("Approx. ISE (k-NN)  =", mse_knn,  "\n")

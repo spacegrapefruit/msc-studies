@@ -3,6 +3,8 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{float}
 \usepackage[margin=1in]{geometry}
 
 \title{Parametric \& Nonparametric Statistics Project}
@@ -651,6 +653,73 @@ All in all, the results show the following:
 
 \section{Task 3: Nonparametric density estimation}
 
-% TODO
+We generate data from the mixture distribution 
+\[
+  G(u) \;=\; \pi_{0} G_{0}(u) \;+\; \pi_{1} G_{1}(u) \;+\; \pi_{2} G_{2}(u),
+\]
+where \(\pi_{0} = \tfrac{15}{33}, \pi_{1} = \tfrac{9}{33}, \pi_{2} = \tfrac{9}{33}\) and each \(G_{l}\) is a uniform distribution with different parameters:
+\[
+  G_{0} \sim \mathrm{Uniform}(-9,\,13), \quad
+  G_{1} \sim \mathrm{Uniform}(-31,\,35), \quad
+  G_{2} \sim \mathrm{Uniform}(11.0351,\,18.3685).
+\]
+From this, the true density is
+\[
+   g(u) \;=\; \pi_{0} g_{0}(u) \;+\; \pi_{1} g_{1}(u) \;+\; \pi_{2} g_{2}(u).
+\]
+
+A simple random sample of size \(N = 2000\) is drawn by first sampling \(U \sim \text{Uniform}(0, 1)\) and assigning each observation to component \(l\) if \(U\) lies in the respective interval. We then apply four nonparametric density estimators:
+
+\begin{itemize}
+  \item Least Squared Cross-Validation (LSCV)
+  \item Refined Plug-In
+  \item Smoothed Bootstrap for bandwidth selection
+  \item \(k\)-Nearest Neighbor density estimation with \(k = 50\)
+\end{itemize}
+
+Each estimator is compared on a uniform 1000-point grid covering the range of the sample. We plot the true density against the estimates.
+
+Finally, we compute an approximate Integrated Squared Error to evaluate performance.
+
+\subsection{Simulation Results}
+
+The simulations have been performed and the results are displayed in the following figures:
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{density_estimation_comparison_p1.png}
+  \caption{Density estimation for the mixture distribution, LSCV and Refined Plug\-In methods.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{density_estimation_comparison_p2.png}
+  \caption{Density estimation for the mixture distribution, Smoothed Bootstrap and \(k\)-Nearest Neighbor methods.}
+\end{figure}
+
+The Integrated Squared Error for each method is as follows:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|}
+\hline
+\textbf{Method} & \textbf{Integrated Squared Error} \\ \hline
+LSCV & 0.000719 \\ \hline
+Refined Plug-In & 0.001004 \\ \hline
+Smoothed Bootstrap & 0.002104 \\ \hline
+\(k\)-Nearest Neighbor & 0.001034 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Discussion}
+
+The results of the density estimation are as follows:
+
+\begin{itemize}
+  \item The LSCV method provides the most accurate density estimate, with the lowest Integrated Squared Error. It captures the general shape of the density and estimates the highest density close to the true density.
+  \item The Refined Plug-In method is also accurate, but slightly less so than LSCV. It is smoother than the LSCV method, but it is visibly less accurate in regions of sharp change in the density.
+  \item The \(k\)-Nearest Neighbor method is about as accurate as Refined Plug-In, but it is significantly less smooth. Additionally, it estimates the highest density outside the range of the true density.
+  \item The Smoothed Bootstrap method captures the general shape of the density, but it is significantly less accurate than the other methods. It is also less smooth and not as accurate in regions of sharp change in the density.
+\end{itemize}
 
 \end{document}
