@@ -192,66 +192,58 @@ for (n in c(n1, n2)) {
 # 2.2.1. Checking bootstrap consistency for Gamma(0.5, 9), N=100
 ##############################################################################
 
-set.seed(1337)
-
-N <- 100
+Ns <- c(100, 1000, 10000)
 a_true <- 0.5   # shape
 b_true <- 9     # scale
 B_boot <- 2000  # number of bootstrap replications
 
-# generate data
-Y <- rgamma(N, shape=a_true, scale=b_true)
+for (N in Ns) {
+  set.seed(1337)
 
-gamma_fit <- fitdistr(Y, densfun="gamma")  # shape, rate=1/scale
+  # generate data
+  Y <- rgamma(N, shape=a_true, scale=b_true)
 
-# parametric bootstrap
-a_hat <- gamma_fit$estimate["shape"]
-b_hat <- 1/gamma_fit$estimate["rate"]  # scale = 1/rate
+  # parametric bootstrap
+  gamma_fit <- fitdistr(Y, densfun="gamma")  # shape, rate=1/scale
+  a_hat <- gamma_fit$estimate["shape"]
+  b_hat <- 1/gamma_fit$estimate["rate"]  # scale = 1/rate
 
-ybar_param_boot <- numeric(B_boot)
-for (b in 1:B_boot) {
-  Ystar <- rgamma(N, shape=a_hat, scale=b_hat)
-  ybar_param_boot[b] <- mean(Ystar)
+  ybar_param_boot <- numeric(B_boot)
+  for (b in 1:B_boot) {
+    Ystar <- rgamma(N, shape=a_hat, scale=b_hat)
+    ybar_param_boot[b] <- mean(Ystar)
+  }
+
+  # nonparametric bootstrap
+  ybar_nparam_boot <- numeric(B_boot)
+  for (b in 1:B_boot) {
+    Ystar_np <- sample(Y, size=N, replace=TRUE)
+    ybar_nparam_boot[b] <- mean(Ystar_np)
+  }
+
+  cdf_mean_gamma <- function(x, shape, scale) {
+    pgamma(x, shape=shape, scale=scale)
+  }
+
+  cdfYbar_true <- function(x) {
+    cdf_mean_gamma(x, shape=N*a_true, scale=b_true/N)
+  }
+  ks_param_stats <- ks.test(ybar_param_boot, cdfYbar_true)
+
+  # similarly for nonparam
+  ks_nparam_stats <- ks.test(ybar_nparam_boot, cdfYbar_true)
+
+  cat("Gamma(0.5, 9), N =", N, "\n")
+  cat("  KS (param)\n", ks_param_stats$statistic, "\n")
+  cat("  KS (nonparam)\n", ks_nparam_stats$statistic, "\n")
 }
-
-# nonparametric bootstrap
-ybar_nparam_boot <- numeric(B_boot)
-for (b in 1:B_boot) {
-  Ystar_np <- sample(Y, size=N, replace=TRUE)
-  ybar_nparam_boot[b] <- mean(Ystar_np)
-}
-
-ks_distance_true <- function(x_sample, cdfF) {
-  x_sorted <- sort(x_sample)
-  n_s <- length(x_sample)
-  Fn <- seq_len(n_s)/n_s
-
-  F_theory <- sapply(x_sorted, cdfF)
-  max(abs(Fn - F_theory))
-}
-
-cdf_mean_gamma <- function(x, shape, scale) {
-  pgamma(x, shape=shape, scale=scale)
-}
-
-cdfYbar_true <- function(x) {
-  cdf_mean_gamma(x, shape=N*a_true, scale=b_true/N)
-}
-ks_param_stats <- ks.test(ybar_param_boot, cdfYbar_true)
-
-# similarly for nonparam
-ks_nparam_stats <- ks.test(ybar_nparam_boot, cdfYbar_true)
-
-cat("Gamma(0.5, 9), N=100\n")
-cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
-cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
 # plot the bootstrap distributions
 png("gamma_bootstrap_distributions.png", width = 1000, height = 600)
 
 # not histogram, but density plot
-plot(density(ybar_param_boot, bw=0.07), col="red", lwd=2, xlab="Ybar", ylab="Density", main="", ylim=c(0, 0.65))
-lines(density(ybar_nparam_boot, bw=0.07), col="blue", lwd=2, main="")
+plot(density(ybar_param_boot, bw=0.01), col="red", lwd=2, xlab="Ybar", ylab="Density", main="", ylim=c(0, 7))
+lines(density(ybar_nparam_boot, bw=0.01), col="blue", lwd=2, main="")
 # add true value
 x <- seq(2, 8, length.out=1000)
 lines(x, dgamma(x, shape=N*a_true, scale=b_true/N), col="black", lwd=2)
@@ -266,10 +258,8 @@ dev.off()
 # 2.2.2. Checking bootstrap consistency for Pareto(c=9, d=0.5), N=100
 ##############################################################################
 
-set.seed(1337)
-
 # Monte Carlo to approximate true distribution
-N <- 100
+Ns <- c(100, 1000, 10000)
 c_true <- 9
 d_true <- 0.5
 M_large <- 2e5  # 200k for MC approximation
@@ -280,14 +270,6 @@ M_large <- 2e5  # 200k for MC approximation
 #   c * ((1 - U)^(-1/d))
 # }
 
-# generate matrix
-data_all <- rpareto(M_large, location=c_true, shape=d_true)  # 2000 blocks
-mat_all <- matrix(data_all, nrow=2000, ncol=N)
-means_all <- rowMeans(mat_all)  # mean of each block
-
-# from one sample of size N=100
-Y <- rpareto(N, location=c_true, shape=d_true)
-
 # parametric bootstrap
 pareto_mle <- function(y) {
   c_ml <- min(y)
@@ -295,43 +277,76 @@ pareto_mle <- function(y) {
   c(c_ml, d_ml)
 }
 
-mle_pareto <- pareto_mle(Y)
-c_hat <- mle_pareto[1]
-d_hat <- mle_pareto[2]
+# generate matrix
+data_all <- rpareto(M_large, location=c_true, shape=d_true)  # 2000 blocks
+mat_all <- matrix(data_all, nrow=2000, ncol=N)
+means_all <- rowMeans(mat_all)  # mean of each block
 
-B_boot <- 2000
-ybar_param <- numeric(B_boot)
-for (b in 1:B_boot) {
-  Ystar <- rpareto(N, location=c_hat, shape=d_hat)
-  ybar_param[b] <- mean(Ystar)
+for (N in Ns) {
+  set.seed(1337)
+
+  # from one sample of size N=100
+  Y <- rpareto(N, location=c_true, shape=d_true)
+
+  mle_pareto <- pareto_mle(Y)
+  c_hat <- mle_pareto[1]
+  d_hat <- mle_pareto[2]
+
+  B_boot <- 2000
+  ybar_param <- numeric(B_boot)
+  for (b in 1:B_boot) {
+    Ystar <- rpareto(N, location=c_hat, shape=d_hat)
+    ybar_param[b] <- mean(Ystar)
+  }
+
+  # nonparametric bootstrap
+  ybar_nparam <- numeric(B_boot)
+  for (b in 1:B_boot) {
+    Ystar_np <- sample(Y, size=N, replace=TRUE)
+    ybar_nparam[b] <- mean(Ystar_np)
+  }
+
+  # compare each to true distribution
+  ks_param_stats <- suppressWarnings(ks.test(ybar_param, means_all))
+  ks_nparam_stats <- suppressWarnings(ks.test(ybar_nparam, means_all))
+
+  cat("Pareto(c=9, d=0.5), N =", N, "\n")
+  cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
+  cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 }
-
-# nonparametric bootstrap
-ybar_nparam <- numeric(B_boot)
-for (b in 1:B_boot) {
-  Ystar_np <- sample(Y, size=N, replace=TRUE)
-  ybar_nparam[b] <- mean(Ystar_np)
-}
-
-# compare each to true distribution
-ks_param_stats <- suppressWarnings(ks.test(ybar_param, means_all))
-ks_nparam_stats <- suppressWarnings(ks.test(ybar_nparam, means_all))
-
-cat("Pareto(c=9, d=0.5), N=100\n")
-cat("  KS (param)\n", ks_param_stats$statistic, ks_param_stats$p.value, "\n")
-cat("  KS (nonparam)\n", ks_nparam_stats$statistic, ks_nparam_stats$p.value, "\n")
 
 # plot the bootstrap distributions
 png("pareto_bootstrap_distributions.png", width = 1000, height = 600)
 
 # not histogram, but density plot
-plot(density(ybar_param, bw=100, from=0, to=50000), col="red", lwd=2, xlab="Ybar", ylab="Density", xlim=c(0, 50000), ylim=c(0, 0.001), main="")
-lines(density(ybar_nparam, bw=1), col="blue", lwd=2, main="")
+param_density <- density(log(ybar_param), bw=0.03, from=1, to=17)
+plot(
+  exp(param_density$x),
+  param_density$y / exp(param_density$x),
+  col="red",
+  lwd=2,
+  xlab="Ybar",
+  ylab="Density",
+  xlim=c(1e1, 1e7),
+  ylim=c(1e-12, 1e-2),
+  main="",
+  log="xy",
+  type="l"
+)
+
+nparam_density <- density(log(ybar_nparam), bw=0.03, from=1, to=17)
+lines(
+  exp(nparam_density$x),
+  nparam_density$y / exp(nparam_density$x),
+  col="blue",
+  lwd=2,
+  main=""
+)
 # add true value
-x <- seq(0, 50000)
+x <- exp(seq(1, 18, length.out=1000))
 lines(x, dpareto(x, location=c_true, shape=d_true), col="black", lwd=2)
 
-legend("topright", legend=c("Parametric", "Nonparametric", "True"),
+legend("topright", legend=c("Parametric (log smoothing)", "Nonparametric (log smoothing)", "True"),
        col=c("red", "blue", "black"), lty=1, lwd=2)
 
 dev.off()

@@ -509,12 +509,12 @@ If the parametric family \(\mathcal{G}(\Theta)\) is known and correct, the param
 
 \subsection{Checking Bootstrap Consistency}
 
-In this section, we will check the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\) by comparing its true distribution with the bootstrap distribution. We will use the Kolmogorov-Smirnov distance as the measure of discrepancy between the two distributions.
+In this section, we will be checking the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\) by comparing its true distribution with the bootstrap distribution with different sample sizes. We will use the Kolmogorov-Smirnov distance as the measure of discrepancy between the two distributions.
 
 To assess whether the chosen bootstrap procedure consistently approximates the distribution of the sample mean \(\overline{Y}_N\), we will use the following algorithm:
 
 \begin{enumerate}
-  \item \textbf{Generate the sample:} Generate a sample of size \(N = 100\) for the given distribution (Gamma or Pareto).
+  \item \textbf{Generate the sample:} Generate a sample of size \(N = 100, 1,000, 10,000\) for the given distribution (Gamma or Pareto).
   \item \textbf{Determine true distribution:} For the Gamma distribution, we compare \(\overline{Y}_N\) against the known true distribution. For the Pareto distribution, we will obtain the true distribution via Monte Carlo simulation.
   \item \textbf{Bootstrap procedure:} Generate \(B = 2000\) bootstrap samples using the method provided below.
     \begin{itemize}
@@ -522,7 +522,7 @@ To assess whether the chosen bootstrap procedure consistently approximates the d
         \item \textbf{Nonparametric bootstrap:} Resample \(\{Y_i\}\) with replacement to form bootstrap samples, compute \(\overline{Y}_N^*\), and again build the empirical distribution.
     \end{itemize}
   \item \textbf{Compare distributions:} Compare the true distribution of the estimator to each bootstrap approximation using Kolmogorov-Smirnov distance between the bootstrap sample of \(\overline{Y}_N^*\) and the reference distribution.
-%   \item \textbf{Interpret the Results:} If the bootstrap distribution closely matches the true reference distribution, it indicates that the method is consistent for approximating uncertainty about the statistic.
+  \item \textbf{Interpret the Results:} If the Kolmogorov-Smirnov distance converges to zero as \(N \to \infty\), the bootstrap procedure is consistent. If the distance is significant, the bootstrap procedure does not approximate the true distribution of the sample mean.
 \end{enumerate}
 
 \subsubsection{Gamma Distribution}
@@ -538,32 +538,36 @@ We will check the consistency of the bootstrap procedure for the sample mean \(\
 
 The sample mean \(\overline{Y}_N\) is the sum of \(N\) independent and identically distributed random variables \(Y_i \sim F_1\) divided by \(N\). Thus, \(\overline{Y}_N \sim Gamma(N \cdot a, b / N)\).
 
-We will generate a sample of size \(N = 100\) from the Gamma distribution with \(a = 0.5\) and \(b = 9\). We will compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
+We will generate a sample of size \(N = 100, 1,000, 10,000\) from the Gamma distribution with \(a = 0.5\) and \(b = 9\). We will compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
 
 We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
-The resulting density functions are displayed in Figure~\ref{fig:gamma_bootstrap}.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.8\textwidth]{gamma_bootstrap_distributions.png}
-\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Gamma distribution.}
-\label{fig:gamma_bootstrap}
-\end{figure}
-
-The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distributions are as follows:
+The Kolmogorov-Smirnov distances are as follows:
 
 \begin{table}[h]
 \centering
 \begin{tabular}{|c|c|c|}
 \hline
-\textbf{Bootstrap Type} & \textbf{Kolmogorov-Smirnov Distance} & \textbf{p-value} \\ \hline
-Parametric & 0.3593 & \(1.07 \times 10^{-224}\) \\ \hline
-Nonparametric & 0.3840 & \(1.36 \times 10^{-256}\) \\ \hline
+\textbf{Sample Size} & \textbf{Bootstrap Type} & \textbf{Kolmogorov-Smirnov Distance} \\ \hline
+100 & Parametric & 0.3593 \\ \hline
+100 & Nonparametric & 0.3840 \\ \hline
+1,000 & Parametric & 0.5220 \\ \hline
+1,000 & Nonparametric & 0.5271 \\ \hline
+10,000 & Parametric & 0.2225 \\ \hline
+10,000 & Nonparametric & 0.2182 \\ \hline
 \end{tabular}
 \end{table}
 
-All of the results are significant at the \(\alpha = 0.1\) level. We have rejected the null hypothesis with a high degree of confidence even though we have sampled from the true distribution. This shows that the bootstrap procedure does not closely approximate the true distribution of the sample mean \(\overline{Y}_N\) for the Gamma distribution with \(N = 100\). The sample size is not large enough to accurately estimate the distribution of the sample mean.
+The resulting density functions at \(N = 10,000\) are displayed in Figure~\ref{fig:gamma_bootstrap}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{gamma_bootstrap_distributions.png}
+\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Gamma distribution at \(N = 10,000\).}
+\label{fig:gamma_bootstrap}
+\end{figure}
+
+Interestingly, parametric and nonparametric bootstrap produced very similar Kolmogorov-Smirnov distances and density functions, see Figure~\ref{fig:gamma_bootstrap}. All of the results are significant at the \(\alpha = 0.1\) level, in fact, the p-values are too low to compute. We have rejected the null hypothesis with a high degree of confidence even though the expectation was different. It seems that the bootstrap procedure may not be a consistent estimator of the true distribution of the sample mean \(\overline{Y}_N\) for the Gamma distribution. However, experimenting with higher sample sizes is necessary to confirm this empirically.
 
 \subsubsection{Pareto Distribution}
 
@@ -571,30 +575,34 @@ Let \(Z \sim Pareto(c, d)\) where \(c > 0\) is the scale parameter and \(d > 0\)
 
 We will check the consistency of the bootstrap procedure for the sample mean \(\overline{Y}_N\) by comparing its true distribution estimated via Monte Carlo simulation with the bootstrap distribution. We will use the Kolmogorov-Smirnov distance as the measure of discrepancy between the two distributions.
 
-We will generate a sample of size \(N = 100\) from \(F_2\) and compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
+We will generate a sample of size \(N = 100, 1,000, 10,000\) from \(F_2\) and compare the true distribution of the sample mean \(\overline{Y}_N\) with the bootstrap distribution obtained by resampling with replacement from the original sample.
 
 We repeat the procedure \(B = 2000\) times to obtain the empirical distribution of \(\overline{Y}_N\). Then the Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distribution is calculated.
 
-The resulting density functions are displayed in Figure~\ref{fig:pareto_bootstrap}.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.8\textwidth]{pareto_bootstrap_distributions.png}
-\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Pareto distribution.}
-\label{fig:pareto_bootstrap}
-\end{figure}
-
-The Kolmogorov-Smirnov distance between the true distribution of the sample mean and the bootstrap distributions are as follows:
+The Kolmogorov-Smirnov distances are as follows:
 
 \begin{table}[h]
 \centering
 \begin{tabular}{|c|c|c|}
 \hline
-\textbf{Bootstrap Type} & \textbf{Kolmogorov-Smirnov Distance} & \textbf{p-value} \\ \hline
-Parametric & 0.1585 & \(3.02 \times 10^{-22}\) \\ \hline
-Nonparametric & 0.2630 & \(1.67 \times 10^{-60}\) \\ \hline
+\textbf{Sample Size} & \textbf{Bootstrap Type} & \textbf{Kolmogorov-Smirnov Distance} \\ \hline
+100 & Parametric & 0.4090 \\ \hline
+100 & Nonparametric & 0.6175 \\ \hline
+1,000 & Parametric & 0.5365 \\ \hline
+1,000 & Nonparametric & 0.7790 \\ \hline
+10,000 & Parametric & 0.8100 \\ \hline
+10,000 & Nonparametric & 0.8090 \\ \hline
 \end{tabular}
 \end{table}
+
+The resulting density functions at \(N = 10,000\) are displayed in Figure~\ref{fig:pareto_bootstrap}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{pareto_bootstrap_distributions.png}
+\caption{True distribution of the sample mean \(\overline{Y}_N\) and the bootstrap distribution for the Pareto distribution at \(N = 10,000\).}
+\label{fig:pareto_bootstrap}
+\end{figure}
 
 All of the results are significant at the \(\alpha = 0.1\) level. We have rejected the null hypothesis with a high degree of confidence even though we have sampled from the true distribution. This shows that the bootstrap procedure does not closely approximate the true distribution of the sample mean \(\overline{Y}_N\) for the Pareto distribution with \(N = 100\). The sample size is not large enough to accurately estimate the distribution of the sample mean.
 
