@@ -754,7 +754,7 @@ legend(
   legend = c(
     "True Density", 
     paste0("Smoothed Bootstrap (bw=", round(bw_boot,3),")"),
-    paste0("k-NN (k=", k_val,")")
+    paste0("k-NN (k=", 50,")")
   ),
   col = c("black", "green", "purple"),
   lty = c(1, 4, 5),
