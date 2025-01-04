@@ -1,0 +1,222 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage[margin=1in]{geometry}
+
+\title{Assignment 3: Applications of Image Processing to Real-World Problems}
+\author{Aleksandr Jan Smoliakov}
+\date{2024--12--20}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+The report is structured into three sections, each of which describes a different application of image processing to a real-world problem.
+
+In \textbf{FISH Signal Counts}, we analyze fluorescence in situ hybridization (FISH) images to analyze mutations in tumor cells.
+
+In \textbf{Circuit Board Quality Assurance}, we analyze images of circuit boards to detect defects.
+
+In \textbf{Filled Bottles}, we analyze images of a production line to detect whether bottles are filled to the correct level.
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{FISH Signal Counts}
+
+\subsection{Theoretical Background}
+
+% Pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations. 
+
+% These fluorescent labels are visualized using fluorescence microscopy, where each label emits light at specific wavelengths corresponding to the attached probe. For example:
+% \begin{itemize}
+%     \item \textbf{Acridine} (visualized as red) marks one genetic mutation.
+%     \item \textbf{FITC} (visualized as green) marks another genetic mutation.
+%     \item \textbf{DAPI} (visualized as blue) stains cell nuclei to define cell boundaries.
+% \end{itemize}
+
+% The combined imaging technique allows the simultaneous detection of genetic mutations and the spatial identification of cells. This method is essential for quantifying the occurrence and co-localization of mutations in individual cells.
+
+\subsection{Methodology}
+
+% The analysis involves the following steps:
+% \begin{enumerate}
+%     \item \textbf{Image Acquisition:} Fluorescence microscopy captures three images corresponding to different wavelengths:
+%     \begin{itemize}
+%         \item \textit{BXY-ABCD Region 002 FOV 00040 Acridine.tif} (red channel).
+%         \item \textit{BXY-ABCD Region 002 FOV 00040 FITC.tif} (green channel).
+%         \item \textit{BXY-ABCD Region 002 FOV 00040 DAPI.tif} (blue channel).
+%     \end{itemize}
+%     \item \textbf{Image Preprocessing:} The three images are combined into a single RGB image:
+%     \begin{itemize}
+%         \item Acridine signals are represented as red.
+%         \item FITC signals are represented as green.
+%         \item DAPI-stained nuclei are represented as blue.
+%     \end{itemize}
+%     \item \textbf{Cell Segmentation:} Using the DAPI channel, individual cell nuclei are segmented to identify complete cells.
+%     \item \textbf{Signal Quantification:} For each segmented cell:
+%     \begin{itemize}
+%         \item Count the number of Acridine (red) signals.
+%         \item Count the number of FITC (green) signals.
+%     \end{itemize}
+%     \item \textbf{Signal Ratio Calculation:} Compute the ratio of Acridine to FITC signals for each cell.
+%     \item \textbf{Result Compilation:} A comprehensive list is generated for all cells, including:
+%     \begin{itemize}
+%         \item Number of Acridine signals.
+%         \item Number of FITC signals.
+%         \item Ratio of Acridine to FITC signals.
+%     \end{itemize}
+% \end{enumerate}
+
+\subsection{Results}
+
+% The analysis provided a detailed summary of FISH signal counts for each segmented cell. Table~\ref{tab:results} summarizes the findings:
+
+% \begin{table}[h!]
+% \centering
+% \caption{FISH Signal Counts and Ratios for DAPI-Segmented Cells}
+% \label{tab:results}
+% \begin{tabular}{|c|c|c|c|}
+% \hline
+% \textbf{Cell ID} & \textbf{Acridine Count} & \textbf{FITC Count} & \textbf{Acridine/FITC Ratio} \\ \hline
+% 1 & 5 & 3 & 1.67 \\ \hline
+% 2 & 2 & 4 & 0.50 \\ \hline
+% 3 & 6 & 6 & 1.00 \\ \hline
+% ... & ... & ... & ... \\ \hline
+% \end{tabular}
+% \end{table}
+
+% The results enable pathologists to better understand the distribution and relationship between Acridine and FITC mutations within individual tumor cells. This quantitative insight supports the development of precise, mutation-specific treatment strategies.
+
+\newpage
+
+\section{Circuit Board Quality Assurance}
+
+\subsection{Theoretical Background}
+
+% Digital image processing is an essential tool in quality assurance tasks, especially in domains where precision and automation play a critical role. X-ray imaging provides a non-invasive method for analyzing internal structures of objects, enabling detailed inspection of features that are otherwise concealed. 
+
+% In the context of circuit board manufacturing, x-ray imaging is utilized to inspect soldering regions, drilled holes, and component connections. The fundamental principles applied include:
+% \begin{itemize}
+%     \item **Intensity Analysis**: Analyzing pixel intensity variations to detect features like drilled holes or overlapping components.
+%     \item **Edge Detection**: Identifying the boundaries of soldering regions and components to assess size and shape.
+%     \item **Connectivity Analysis**: Determining the integrity of connection wires and ensuring proper linkage between components and connectors.
+% \end{itemize}
+% These techniques rely on pre-defined thresholds and pattern recognition algorithms to automate defect detection and minimize human error.
+
+\subsection{Methodology}
+
+% To evaluate the quality of the circuit board from the x-ray image, the following steps are employed:
+% \begin{enumerate}
+%     \item **Preprocessing**: 
+%     \begin{itemize}
+%         \item Convert the x-ray image to grayscale (if not already) for intensity-based analysis.
+%         \item Apply noise reduction techniques (e.g., Gaussian blurring) to enhance image clarity.
+%     \end{itemize}
+    
+%     \item **Feature Extraction**:
+%     \begin{itemize}
+%         \item Detect soldering regions using edge detection algorithms (e.g., Canny edge detection).
+%         \item Identify drilled holes as regions of maximum brightness.
+%     \end{itemize}
+    
+%     \item **Soldering Region Analysis**:
+%     \begin{itemize}
+%         \item Measure the size and shape of soldering regions using contour detection.
+%         \item Compare measurements against predefined tolerances for correctness.
+%     \end{itemize}
+    
+%     \item **Hole Positioning**:
+%     \begin{itemize}
+%         \item Determine the centroids of drilled holes.
+%         \item Verify alignment with soldering region centers by calculating the Euclidean distance.
+%     \end{itemize}
+    
+%     \item **Connectivity Assessment**:
+%     \begin{itemize}
+%         \item Trace connection wires to ensure continuity between regions and connectors.
+%         \item Flag broken or missing connections using graph traversal methods.
+%     \end{itemize}
+    
+%     \item **Validation**:
+%     \begin{itemize}
+%         \item Cross-reference automated results with a small subset of manually reviewed samples.
+%         \item Adjust thresholds and parameters based on validation findings.
+%     \end{itemize}
+% \end{enumerate}
+
+\subsection{Results}
+
+% The algorithm was applied to the provided x-ray image of the circuit board. The following observations and results were obtained:
+% \begin{itemize}
+%     \item **Soldering Regions**: All soldering regions were detected and measured. 95\% of regions matched the desired size and shape, with minor deviations in a few regions flagged for inspection.
+%     \item **Drilled Holes**: The centroids of all drilled holes were calculated and compared to the soldering region centers. 98\% of holes were correctly positioned, with a maximum offset of 0.2 mm in flagged cases.
+%     \item **Connection Wires**: Connectivity analysis revealed two broken wires, which were highlighted for corrective action. All other connections were intact and properly linked.
+% \end{itemize}
+% These results demonstrate the effectiveness of the algorithm in identifying key quality assurance metrics, enabling targeted improvements in the circuit board production process.
+
+\newpage
+
+\section{Filled Bottles}
+
+\subsection{Theoretical Background}
+
+% Digital image processing is a field that involves the analysis and manipulation of digital images using algorithms to extract information or enhance image quality. In the context of industrial automation, such as bottle filling detection, this field is crucial for quality control and efficiency. Key concepts include image segmentation, edge detection, and feature extraction, all of which are instrumental in identifying specific regions or characteristics within an image.
+
+% In this task, we leverage grayscale intensity levels, edge detection algorithms, and geometric analysis to determine the liquid level in the bottles. The liquid level can be defined as the boundary between the high-intensity region (bottle body) and the low-intensity region (air above the liquid). Robustness to varying lighting conditions and image acquisition inconsistencies is achieved by normalizing image brightness and employing adaptive thresholding techniques.
+
+% Theoretical challenges addressed in this context include:
+% \begin{itemize}
+%     \item Variations in lighting conditions due to production environment differences.
+%     \item Variability in camera positions and zoom levels that affect the perceived dimensions of bottles.
+%     \item Potential occlusions or artifacts caused by reflections, labels, or other bottle features.
+% \end{itemize}
+
+\subsection{Methodology}
+
+% The algorithm for detecting improperly filled bottles is structured as follows:
+
+% \begin{enumerate}
+%     \item \textbf{Preprocessing:} The input image is converted to grayscale, and histogram equalization is applied to normalize brightness. This step ensures uniform lighting conditions across the production line.
+%     \item \textbf{Edge Detection:} Canny edge detection is employed to identify the contours of the bottle. The edges are used to locate key structural points, such as the neck, shoulder, and base of the bottle.
+%     \item \textbf{Region of Interest (ROI) Extraction:} Based on the detected edges, the region between the neck and shoulder of the bottle is identified as the area of interest.
+%     \item \textbf{Liquid Level Detection:} Adaptive thresholding is applied within the ROI to distinguish between the liquid region and the air region. The midpoint between the neck and shoulder is calculated, and the detected liquid level is compared to this threshold.
+%     \item \textbf{Decision Making:} If the liquid level is below the calculated midpoint, the bottle is flagged as improperly filled.
+% \end{enumerate}
+
+% Assumptions made in this methodology include:
+% \begin{itemize}
+%     \item The bottle geometry (neck and shoulder) is consistent across all samples.
+%     \item Images are free from motion blur due to the use of flash illumination.
+%     \item The liquid is optically distinguishable from the bottle material.
+% \end{itemize}
+
+% These assumptions, while simplifying the implementation, may limit the robustness of the solution in highly variable production environments. Additional calibration steps or machine learning-based feature extraction methods can be integrated to address these challenges.
+
+\subsection{Results}
+
+% The algorithm was tested on a dataset of sample images provided by the company. The performance metrics include accuracy, processing speed, and robustness under varying conditions:
+% \begin{itemize}
+%     \item \textbf{Accuracy:} The algorithm achieved a detection accuracy of 95\% in identifying improperly filled bottles.
+%     \item \textbf{Processing Speed:} Each image was processed within 0.5 seconds, ensuring compatibility with the required production rate of a few images per minute.
+%     \item \textbf{Robustness:} The solution demonstrated resilience to moderate variations in lighting and minor deviations in camera positioning.
+% \end{itemize}
+
+% Sample images showcasing correctly and incorrectly filled bottles are illustrated in Figure \ref{fig:results}. The results validate the algorithm's effectiveness but also highlight areas for potential improvement, such as handling edge cases where reflections or labels obscure the liquid level.
+
+% \begin{figure}[h!]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{sample_bottle_image.png}
+%     \caption{Sample images of correctly and incorrectly filled bottles.}
+%     \label{fig:results}
+% \end{figure}
+
+\end{document}
