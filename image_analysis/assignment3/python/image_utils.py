@@ -2,7 +2,8 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from collections import deque
+from typing import Union
+
 from libtiff import TIFF
 
 
@@ -21,9 +22,12 @@ def apply_threshold(image: object, threshold: int) -> np.ndarray:
     return (image > threshold).astype(np.uint8) * 255
 
 
-def save_image(image: np.ndarray, file_path: str):
-    cmap = "gray" if image.ndim == 2 else None
-    plt.imsave(file_path, image, cmap=cmap, vmin=0, vmax=255)
+def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
+    if isinstance(image, plt.Figure):
+        image.savefig(file_path)
+    else:
+        cmap = "gray" if image.ndim == 2 else None
+        plt.imsave(file_path, image, cmap=cmap, vmin=0, vmax=255)
     logging.info(f"Saved image to {file_path}")
 
 
@@ -56,23 +60,21 @@ def label_connected_components(binary_mask: np.ndarray) -> np.ndarray:
     label = 0
     rows, cols = binary_mask.shape
 
-    for x in range(rows):
-        for y in range(cols):
-            if binary_mask[x, y] and labeled_image[x, y] == 0:
+    for x in range(cols):
+        for y in range(rows):
+            if binary_mask[y, x] and labeled_image[y, x] == 0:
                 label += 1
-                flood_fill(binary_mask, labeled_image, x, y, label)
+                flood_fill(binary_mask, labeled_image, y, x, label)
 
     return labeled_image, label
 
 
-def check_border_touching(binary_mask: np.ndarray) -> bool:
-    rows, cols = binary_mask.shape
-    return (
-        np.any(binary_mask[0, :])
-        or np.any(binary_mask[-1, :])
-        or np.any(binary_mask[:, 0])
-        or np.any(binary_mask[:, -1])
-    )
+def check_border_touching(binary_mask: np.ndarray, axes=[0, 1]) -> bool:
+    if 0 in axes and np.any(binary_mask[0, :] | binary_mask[-1, :]):
+        return True
+    if 1 in axes and np.any(binary_mask[:, 0] | binary_mask[:, -1]):
+        return True
+    return False
 
 
 def median_filter(image: np.ndarray, kernel_size: int) -> np.ndarray:
@@ -142,6 +144,22 @@ def calculate_signal_counts(
     ]
 
     return results
+
+
+def make_histogram(
+    image: np.ndarray, bins: int = 256, range: tuple = (0, 256), log_scale: bool = False
+) -> plt.Figure:
+    histogram, _ = np.histogram(image, bins=bins, range=range)
+
+    fig, ax = plt.subplots()
+    ax.plot(histogram)
+    if log_scale:
+        ax.set_yscale("log")
+    ax.set_title("Image Histogram")
+    ax.set_xlabel("Pixel Intensity")
+    ax.set_ylabel("Frequency")
+
+    return fig
 
 
 # def detect_edges(image: np.ndarray, threshold: float = 0.5) -> np.ndarray:

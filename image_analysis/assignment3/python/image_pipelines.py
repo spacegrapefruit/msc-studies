@@ -8,6 +8,7 @@ from image_utils import (
     fill_object_holes,
     label_connected_components,
     load_tiff_image,
+    make_histogram,
     morphological_dilate,
     morphological_erode,
     save_image,
@@ -70,7 +71,7 @@ def fish_signal_counts_pipeline(
             continue
 
         # filter out incomplete cells on the image border
-        is_touching_border = check_border_touching(cell_mask)
+        is_touching_border = check_border_touching(cell_mask, axes=[0, 1])
         if is_touching_border:
             # half-intensity mask
             dapi_mask[cell_mask] = 128
@@ -128,7 +129,7 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
 #     # Find connected components (regions)
 #     labeled_image, num_labels = label_connected_components(binary_image)
 
-#     print(f"Number of detected regions: {num_labels}")
+#     logging.info(f"Number of detected regions: {num_labels}")
 
 #     # Analyze regions for size, shape, and centering
 #     soldering_regions = []
@@ -147,13 +148,13 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
 #         elif area <= 100:  # Example size threshold for drilled holes
 #             holes.append((region_idx, area, centroid))
 
-#     print("\nDetected soldering regions:")
+#     logging.info("\nDetected soldering regions:")
 #     for idx, area, centroid in soldering_regions:
-#         print(f"  Region {idx}: Area = {area}, Centroid = {centroid}")
+#         logging.info(f"  Region {idx}: Area = {area}, Centroid = {centroid}")
 
-#     print("\nDetected drilled holes:")
+#     logging.info("\nDetected drilled holes:")
 #     for idx, area, centroid in holes:
-#         print(f"  Hole {idx}: Area = {area}, Centroid = {centroid}")
+#         logging.info(f"  Hole {idx}: Area = {area}, Centroid = {centroid}")
 
 #     # Check for centering of holes in soldering regions
 #     for hole_idx, _, hole_centroid in holes:
@@ -164,7 +165,7 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
 #                 break
 
 #         if not centered:
-#             print(f"Warning: Hole {hole_idx} is not centered in any soldering region.")
+#             logging.info(f"Warning: Hole {hole_idx} is not centered in any soldering region.")
 
 #     # Check for broken wires (simple adjacency check)
 #     # This part is implementation-specific and will depend on the image details
@@ -179,21 +180,8 @@ def gaussian_blur(image: np.ndarray, sigma: float) -> np.ndarray:
 def filled_bottles_pipeline(input_path: str, output_dir: str):
     image = load_tiff_image(input_path)
 
-    #     image = (image - np.min(image)) / (np.max(image) - np.min(image))
-
-    # gaussian filter
-    # image = gaussian_blur(image, sigma=1)
-
-    histogram, _ = np.histogram(image, bins=256, range=(0, 256))
-    # save histogram
-    import matplotlib.pyplot as plt
-
-    plt.plot(histogram)
-    plt.yscale("log")
-    plt.title("Image Histogram")
-    plt.xlabel("Pixel Intensity")
-    plt.ylabel("Frequency")
-    plt.savefig(output_dir / "histogram.png")
+    histogram_plot = make_histogram(image, log_scale=True)
+    save_image(histogram_plot, output_dir / "histogram.png")
 
     bottle_mask = apply_threshold(image, threshold=0.1)  # TODO: autodetect threshold
 
@@ -202,9 +190,99 @@ def filled_bottles_pipeline(input_path: str, output_dir: str):
     for bottle_idx in range(1, num_bottles + 1):
         bottle_mask = labeled_bottles == bottle_idx
 
+        # filter out incomplete cells on the image border
+        is_touching_border = check_border_touching(bottle_mask, axes=[1])
+        if is_touching_border:
+            continue
+
+        bottle_mask = morphological_erode(bottle_mask, kernel_size=2)
+
+        # plot bottle's histogram
+        bottle_hist = make_histogram(image[bottle_mask])
+        # save_image(bottle_hist, output_dir / f"bottle_{bottle_idx}_histogram.png")
+
+        # calculate row means
+        row_means = np.ma.array(image, mask=~bottle_mask).mean(axis=1)
+        # TODO consider using first 50-100 pixels
+        means_above = np.array([row_means[:i].mean() for i in range(1, len(row_means))])
+        means_below = np.array([row_means[i:].mean() for i in range(1, len(row_means))])
+
+        from matplotlib import pyplot as plt
+
+        fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+        ax[0].plot(row_means)
+        ax[0].set_ylabel("Row mean intensity")
+        ax[1].plot(means_above)
+        ax[1].plot(means_below)
+        ax[1].plot(means_above - means_below)
+        ax[1].set_ylabel("Means")
+        save_image(fig, output_dir / f"bottle_{bottle_idx}_row_means.png")
+
+        means_diff = np.nan_to_num(means_above - means_below, nan=0)
+        level = np.argmax(means_diff)
+        logging.info(f"  Bottle {bottle_idx}:")
+        logging.info(f"    Liquid level = {level}")
+
+        bottle_width = bottle_mask.sum(axis=1)
+        bottle_width = np.convolve(bottle_width, np.ones(5) / 5, mode="full")
+        bottle_width_frac = bottle_width / bottle_width.max()
+
+        step_size = 5
+        angle_top = np.arctan(
+            (bottle_width[step_size:-step_size] - bottle_width[: -step_size * 2])
+            / step_size
+        )
+        angle_bottom = np.arctan(
+            (bottle_width[step_size * 2 :] - bottle_width[step_size:-step_size])
+            / step_size
+        )
+
+        angle1 = np.maximum(
+            np.pad(
+                angle_top - np.abs(angle_bottom),
+                step_size,
+                mode="constant",
+                constant_values=0,
+            ),
+            0,
+        )
+        angle2 = np.maximum(
+            np.pad(
+                angle_bottom - np.abs(angle_top),
+                step_size,
+                mode="constant",
+                constant_values=0,
+            ),
+            0,
+        )
+
+        shoulder_level = np.argmax(angle1 * (0.9 < bottle_width_frac))
+        logging.info(f"    Shoulder level = {shoulder_level}")
+
+        neck_level = np.argmax(
+            angle2 * (0.4 < bottle_width_frac) * (bottle_width_frac < 0.6)
+        )
+        logging.info(f"    Neck level = {neck_level}")
+
+        # find bottle shoulder and neck
+        fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+        ax[0].plot(bottle_width)
+        ax[0].axvline(level, color="blue")
+        ax[0].axvline(shoulder_level, color="red")
+        ax[0].axvline(neck_level, color="green")
+        ax[0].grid()
+        ax[1].plot(angle1)
+        ax[1].plot(angle2)
+        # add line at level
+        ax[1].axvline(level, color="blue")
+        ax[1].axvline(shoulder_level, color="red")
+        ax[1].axvline(neck_level, color="green")
+        ax[1].grid()
+        save_image(fig, output_dir / f"bottle_{bottle_idx}_neck_shoulders.png")
+
 
 #         centroid = calculate_centroid(region_mask)
-#         print(f"  Bottle {i}: Centroid = {centroid}")
+#         logging.info(f"  Bottle {i}: Centroid = {centroid}")
 
 #     improperly_filled = check_filled_bottles(preprocessed_image, labeled_image)
 #     # visualize_results(preprocessed_image, labeled_bottles, improperly_filled)
