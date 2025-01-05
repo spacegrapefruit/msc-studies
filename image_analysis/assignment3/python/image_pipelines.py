@@ -12,16 +12,13 @@ from image_utils import (
     make_bottle_levels_plot,
     make_histogram,
     make_mean_intensity_plot,
+    median_filter,
     morphological_dilate,
     morphological_erode,
     pad_and_clip_angles,
     save_image,
-    #     flood_fill,
-    #     check_filled_bottles,
-    #     visualize_results,
-    #     calculate_centroid,
-    #     is_centered,
-    #     median_filter,
+    # calculate_centroid,
+    # is_centered,
 )
 
 
@@ -98,26 +95,15 @@ def fish_signal_counts_pipeline(
     return results
 
 
-#     # # Optional: Display labeled cells
-#     # plt.imshow(labeled_cells, cmap="nipy_spectral")
-#     # plt.title("Labeled DAPI Cells")
-#     # plt.colorbar()
-#     # plt.show()
-
-
 def circuit_board_qa_pipeline(input_path: str, output_dir: str):
     image = load_tiff_image(input_path)
 
+    # fix salt-and-pepper noise using median filtering
+    noise_mask = (image == 0) | (image == 255)
+    image_filtered = median_filter(image, kernel_size=1)
+    image[noise_mask] = image_filtered[noise_mask]
 
-#     # # Display the original image for reference
-#     # plt.figure(figsize=(8, 8))
-#     # plt.title("Original Circuit Board X-ray Image")
-#     # plt.imshow(image, cmap='gray')
-#     # plt.axis('off')
-#     # plt.show()
-
-#     # Fix salt-and-pepper noise using median filtering
-#     image = median_filter(image, kernel_size=3)
+    save_image(image, output_dir / "median_filtered_image.png")
 
 #     # Thresholding to identify bright regions (drilled holes, soldering regions)
 #     threshold = np.percentile(image, 99)  # Bright regions threshold
