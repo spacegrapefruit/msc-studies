@@ -162,49 +162,74 @@ def make_histogram(
     return fig
 
 
+def make_mean_intensity_plot(
+    row_means: np.ndarray,
+    means_above: np.ndarray,
+    means_below: np.ndarray,
+    liquid_level: int,
+) -> plt.Figure:
+    fig, ax = plt.subplots(2, 1)
+
+    ax[0].plot(row_means)
+    ax[0].set_ylabel("Row mean intensity")
+    ax[1].plot(means_above)
+    ax[1].plot(means_below)
+    ax[1].plot(means_above - means_below)
+    ax[1].set_ylabel("Means")
+
+    return fig
+
+
+def make_bottle_levels_plot(
+    bottle_width: np.ndarray,
+    angle1: np.ndarray,
+    angle2: np.ndarray,
+    liquid_level: int,
+    shoulder_level: int,
+    neck_level: int,
+):
+    fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+    # plot bottle width
+    ax[0].plot(bottle_width)
+    ax[0].grid()
+
+    # plot angles
+    ax[1].plot(angle1)
+    ax[1].plot(angle2)
+
+    # add lines at all levels
+    ax[0].axvline(liquid_level, color="blue")
+    ax[0].axvline(shoulder_level, color="red")
+    ax[0].axvline(neck_level, color="green")
+    ax[1].axvline(liquid_level, color="blue")
+    ax[1].axvline(shoulder_level, color="red")
+    ax[1].axvline(neck_level, color="green")
+    ax[1].grid()
+
+    return fig
+
+
+def pad_and_clip_angles(angles: np.ndarray, step_size: int = 5):
+    angles = np.pad(angles, step_size, mode="constant", constant_values=0)
+    angles = np.maximum(angles, 0)
+    return angles
+
+
+def calculate_gradients(bottle_width: np.ndarray, step_size: int = 5):
+    angle_top = np.arctan(
+        (bottle_width[step_size:-step_size] - bottle_width[: -step_size * 2])
+        / step_size
+    )
+    angle_bottom = np.arctan(
+        (bottle_width[step_size * 2 :] - bottle_width[step_size:-step_size]) / step_size
+    )
+    return angle_top, angle_bottom
+
+
 # def detect_edges(image: np.ndarray, threshold: float = 0.5) -> np.ndarray:
 #     gradient = np.abs(np.gradient(image, axis=0)) + np.abs(np.gradient(image, axis=1))
 #     edges = gradient > threshold
 #     return edges
-
-
-# def check_filled_bottles(image: np.ndarray, labeled_image: np.ndarray) -> list:
-#     improperly_filled_bottles = []
-
-#     for i in range(1, np.max(labeled_image) + 1):
-#         region_mask = labeled_image == i
-#         region_dims = np.argwhere(region_mask)
-#         bottle_corners = (
-#             np.min(region_dims[:, 0]),
-#             np.max(region_dims[:, 0]),
-#             np.min(region_dims[:, 1]),
-#             np.max(region_dims[:, 1]),
-#         )
-#         print(f"Region {i} corners: {bottle_corners}")
-
-#         # Check if the bottle is filled
-#         bottle_region = image[bottle_corners[0] : bottle_corners[1], bottle_corners[2] : bottle_corners[3]]
-#         colour_levels = np.zeros((bottle_corners[1] - bottle_corners[0], 3))  # white, grey, black
-#         for row in range(bottle_corners[0], bottle_corners[1]):
-#             colour_levels[row - bottle_corners[0], 0] = np.sum(bottle_region[row - bottle_corners[0]] > 0.95)
-#             colour_levels[row - bottle_corners[0], 2] += np.sum(bottle_region[row - bottle_corners[0]] == 0)
-#             colour_levels[row - bottle_corners[0], 1] = bottle_corners[3] - bottle_corners[2] - colour_levels[row - bottle_corners[0], 0] - colour_levels[row - bottle_corners[0], 2] + 1
-#         print(f"Colour levels: {colour_levels}")
-
-#     quit()
-#     return improperly_filled_bottles
-
-
-# def visualize_results(image: np.ndarray, bottle_regions: list, improperly_filled: list):
-#     plt.imshow(image, cmap="gray")
-
-#     for region in bottle_regions:
-#         col, start, end = region
-#         color = "g" if region not in improperly_filled else "r"
-#         plt.plot([col, col], [start, end], color)
-
-#     plt.title("Bottle Fill Detection")
-#     plt.show()
 
 
 # def calculate_centroid(region_mask):

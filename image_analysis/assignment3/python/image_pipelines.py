@@ -3,14 +3,18 @@ import logging
 import numpy as np
 from image_utils import (
     apply_threshold,
+    calculate_gradients,
     calculate_signal_counts,
     check_border_touching,
     fill_object_holes,
     label_connected_components,
     load_tiff_image,
+    make_bottle_levels_plot,
     make_histogram,
+    make_mean_intensity_plot,
     morphological_dilate,
     morphological_erode,
+    pad_and_clip_angles,
     save_image,
     #     flood_fill,
     #     check_filled_bottles,
@@ -171,14 +175,9 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
 #     # This part is implementation-specific and will depend on the image details
 
 
-def gaussian_blur(image: np.ndarray, sigma: float) -> np.ndarray:
-    from scipy.ndimage import gaussian_filter
-
-    return gaussian_filter(image, sigma=sigma)
-
-
 def filled_bottles_pipeline(input_path: str, output_dir: str):
     image = load_tiff_image(input_path)
+    final_image = np.zeros_like(image, dtype=np.uint8)
 
     histogram_plot = make_histogram(image, log_scale=True)
     save_image(histogram_plot, output_dir / "histogram.png")
@@ -187,103 +186,81 @@ def filled_bottles_pipeline(input_path: str, output_dir: str):
 
     labeled_bottles, num_bottles = label_connected_components(bottle_mask)
 
+    results = []
     for bottle_idx in range(1, num_bottles + 1):
         bottle_mask = labeled_bottles == bottle_idx
 
         # filter out incomplete cells on the image border
         is_touching_border = check_border_touching(bottle_mask, axes=[1])
         if is_touching_border:
+            final_image[bottle_mask] = 64
             continue
 
+        # erode the edges a little to remove black borders
         bottle_mask = morphological_erode(bottle_mask, kernel_size=2)
-
-        # plot bottle's histogram
-        bottle_hist = make_histogram(image[bottle_mask])
-        # save_image(bottle_hist, output_dir / f"bottle_{bottle_idx}_histogram.png")
 
         # calculate row means
         row_means = np.ma.array(image, mask=~bottle_mask).mean(axis=1)
-        # TODO consider using first 50-100 pixels
+        # TODO consider using 50-100 edge pixels
         means_above = np.array([row_means[:i].mean() for i in range(1, len(row_means))])
         means_below = np.array([row_means[i:].mean() for i in range(1, len(row_means))])
-
-        from matplotlib import pyplot as plt
-
-        fig, ax = plt.subplots(2, 1, figsize=(8, 8))
-        ax[0].plot(row_means)
-        ax[0].set_ylabel("Row mean intensity")
-        ax[1].plot(means_above)
-        ax[1].plot(means_below)
-        ax[1].plot(means_above - means_below)
-        ax[1].set_ylabel("Means")
-        save_image(fig, output_dir / f"bottle_{bottle_idx}_row_means.png")
-
         means_diff = np.nan_to_num(means_above - means_below, nan=0)
-        level = np.argmax(means_diff)
-        logging.info(f"  Bottle {bottle_idx}:")
-        logging.info(f"    Liquid level = {level}")
+        liquid_level = np.argmax(means_diff)
+
+        mean_intensity_plot = make_mean_intensity_plot(
+            row_means, means_above, means_below, liquid_level
+        )
+        save_image(
+            mean_intensity_plot, output_dir / f"bottle_{bottle_idx}_mean_intensity.png"
+        )
 
         bottle_width = bottle_mask.sum(axis=1)
         bottle_width = np.convolve(bottle_width, np.ones(5) / 5, mode="full")
         bottle_width_frac = bottle_width / bottle_width.max()
 
-        step_size = 5
-        angle_top = np.arctan(
-            (bottle_width[step_size:-step_size] - bottle_width[: -step_size * 2])
-            / step_size
-        )
-        angle_bottom = np.arctan(
-            (bottle_width[step_size * 2 :] - bottle_width[step_size:-step_size])
-            / step_size
-        )
-
-        angle1 = np.maximum(
-            np.pad(
-                angle_top - np.abs(angle_bottom),
-                step_size,
-                mode="constant",
-                constant_values=0,
-            ),
-            0,
-        )
-        angle2 = np.maximum(
-            np.pad(
-                angle_bottom - np.abs(angle_top),
-                step_size,
-                mode="constant",
-                constant_values=0,
-            ),
-            0,
-        )
+        angle_top, angle_bottom = calculate_gradients(bottle_width, step_size=5)
+        angle1 = pad_and_clip_angles(angle_top - np.abs(angle_bottom), step_size=5)
+        angle2 = pad_and_clip_angles(angle_bottom - np.abs(angle_top), step_size=5)
 
         shoulder_level = np.argmax(angle1 * (0.9 < bottle_width_frac))
-        logging.info(f"    Shoulder level = {shoulder_level}")
-
         neck_level = np.argmax(
             angle2 * (0.4 < bottle_width_frac) * (bottle_width_frac < 0.6)
         )
-        logging.info(f"    Neck level = {neck_level}")
 
-        # find bottle shoulder and neck
-        fig, ax = plt.subplots(2, 1, figsize=(8, 8))
-        ax[0].plot(bottle_width)
-        ax[0].axvline(level, color="blue")
-        ax[0].axvline(shoulder_level, color="red")
-        ax[0].axvline(neck_level, color="green")
-        ax[0].grid()
-        ax[1].plot(angle1)
-        ax[1].plot(angle2)
-        # add line at level
-        ax[1].axvline(level, color="blue")
-        ax[1].axvline(shoulder_level, color="red")
-        ax[1].axvline(neck_level, color="green")
-        ax[1].grid()
-        save_image(fig, output_dir / f"bottle_{bottle_idx}_neck_shoulders.png")
+        bottle_levels_plot = make_bottle_levels_plot(
+            bottle_width=bottle_width,
+            angle1=angle1,
+            angle2=angle2,
+            liquid_level=liquid_level,
+            shoulder_level=shoulder_level,
+            neck_level=neck_level,
+        )
+        save_image(
+            bottle_levels_plot, output_dir / f"bottle_{bottle_idx}_bottle_levels.png"
+        )
 
+        # plot the liquid level
+        final_image[bottle_mask] = 255
+        liquid_mask = np.zeros_like(bottle_mask)
+        liquid_mask[liquid_level:] = 1
+        final_image[bottle_mask & liquid_mask] = 128
 
-#         centroid = calculate_centroid(region_mask)
-#         logging.info(f"  Bottle {i}: Centroid = {centroid}")
+        # draw lines at shoulder and neck levels
+        image_x, image_y = np.indices(bottle_mask.shape)
+        final_image[(image_x == shoulder_level) & bottle_mask] = 64
+        final_image[(image_x == neck_level) & bottle_mask] = 64
 
-#     improperly_filled = check_filled_bottles(preprocessed_image, labeled_image)
-#     # visualize_results(preprocessed_image, labeled_bottles, improperly_filled)
-#     return improperly_filled
+        results.append(
+            {
+                "bottle_id": bottle_idx,
+                "liquid_level": liquid_level,
+                "shoulder_level": shoulder_level,
+                "neck_level": neck_level,
+                "is_filled": liquid_level < (shoulder_level + neck_level) / 2,
+            }
+        )
+
+    # save final image
+    save_image(final_image, output_dir / "final_image.png")
+
+    return results

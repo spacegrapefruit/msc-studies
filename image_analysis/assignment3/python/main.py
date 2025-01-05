@@ -65,10 +65,14 @@ def filled_bottles(input_path: str):
         output_dir=output_dir,
     )
 
+    logging.info("Bottle analysis results")
+    logging.info(f"Total bottles: {len(results)}")
+    logging.info("---------------------")
 
-#     print(f"Found {len(improperly_filled)} improperly filled bottles.")
-#     for i, bottle in enumerate(improperly_filled, start=1):
-#         print(f"  {i}. Bottle at column {bottle[0]}, height {bottle[1]}.")
+    for result in results:
+        logging.info(
+            f"Bottle {result['bottle_id']}: Liquid={result['liquid_level']}, Shoulder={result['shoulder_level']}, Neck={result['neck_level']}, Filled={result['is_filled']}"
+        )
 
 
 if __name__ == "__main__":
