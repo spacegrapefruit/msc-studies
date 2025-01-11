@@ -267,12 +267,6 @@ def calculate_gradients(bottle_width: np.ndarray, step_size: int = 5):
     return angle_top, angle_bottom
 
 
-# def detect_edges(image: np.ndarray, threshold: float = 0.5) -> np.ndarray:
-#     gradient = np.abs(np.gradient(image, axis=0)) + np.abs(np.gradient(image, axis=1))
-#     edges = gradient > threshold
-#     return edges
-
-
 def calculate_centroid(region_mask):
     coords = np.argwhere(region_mask)
     centroid = np.mean(coords, axis=0)
@@ -280,10 +274,9 @@ def calculate_centroid(region_mask):
 
 
 def calculate_dimensions(binary_mask):
-    dim1 = (binary_mask.sum(axis=0) > 0).sum()
-    dim2 = (binary_mask.sum(axis=1) > 0).sum()
-    dims = sorted((dim1, dim2))
-    return dims
+    dim1 = (binary_mask.sum(axis=1) > 0).sum()
+    dim2 = (binary_mask.sum(axis=0) > 0).sum()
+    return (dim1, dim2)
 
 
 # def is_centered(hole_centroid, solder_centroid, tolerance=5):
