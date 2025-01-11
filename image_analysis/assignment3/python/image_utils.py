@@ -35,13 +35,13 @@ def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
     logging.info(f"Saved image to {file_path}")
 
 
-# 4-connectivity, TODO: 8-connectivity?
 def flood_fill(binary_mask, labeled_image, x, y, label):
     stack = [(x, y)]
     while stack:
         cx, cy = stack.pop()
         if binary_mask[cx, cy] and labeled_image[cx, cy] == 0:
             labeled_image[cx, cy] = label
+            # 4-connectivity, consider 8-connectivity?
             for nx, ny in [(cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)]:
                 if 0 <= nx < binary_mask.shape[0] and 0 <= ny < binary_mask.shape[1]:
                     stack.append((nx, ny))
@@ -82,10 +82,8 @@ def check_border_touching(binary_mask: np.ndarray, axes=[0, 1]) -> bool:
     return False
 
 
-def median_filter(image: np.ndarray, kernel_size: int) -> np.ndarray:
-    window_size = 2 * kernel_size + 1
-
-    padded_image = np.pad(image, pad_width=kernel_size, mode="edge")
+def median_filter(image: np.ndarray, window_size: int) -> np.ndarray:
+    padded_image = np.pad(image, pad_width=window_size // 2, mode="edge")
 
     sliding_windows = np.lib.stride_tricks.sliding_window_view(
         padded_image, (window_size, window_size)
@@ -172,7 +170,7 @@ def calculate_signal_counts(
 
     results = [
         {
-            "cell_id": i,
+            **dict(zip(["y", "x"], calculate_centroid(labeled_cells == i))),
             "cell_area": np.sum(labeled_cells == i),
             "acridine_count": acridine_counts[i],
             "fitc_count": fitc_counts[i],
@@ -279,6 +277,17 @@ def calculate_dimensions(binary_mask):
     return (dim1, dim2)
 
 
-# def is_centered(hole_centroid, solder_centroid, tolerance=5):
-#     distance = np.linalg.norm(np.array(hole_centroid) - np.array(solder_centroid))
-#     return distance <= tolerance
+# TODO check all copy() calls
+def fix_salt_and_pepper_noise(image: np.ndarray, noise_values=(0, 255), window_size=3):
+    image = image.copy()
+    noise_mask = np.isin(image, noise_values)
+    image_filtered = median_filter(image, window_size=window_size)
+    image[noise_mask] = image_filtered[noise_mask]
+    return image
+
+
+def determine_region_shape(binary_mask, min_dim, max_dim):
+    area = binary_mask.sum()
+    fill_frac = area / (min_dim * max_dim)
+
+    return "round" if fill_frac < 0.9 else "square"

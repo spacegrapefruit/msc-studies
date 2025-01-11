@@ -37,10 +37,12 @@ def fish_signal_counts(
     logging.info(f"Total cells: {len(results)}")
     logging.info("---------------------")
 
-    for result in results:
-        # TODO add x, y coordinates
+    for i, result in enumerate(results):
+        logging.info(f"Cell {i + 1}")
+        logging.info(f"  X: {result['x']:.2f}, Y: {result['y']:.2f}")
+        logging.info(f"  Area: {result['cell_area']}")
         logging.info(
-            f"Cell {result['cell_id']} (area={result['cell_area']}): Acridine={result['acridine_count']}, FITC={result['fitc_count']}, Ratio={result['acridine_to_fitc_ratio']}"
+            f"  Acridine={result['acridine_count']}, FITC={result['fitc_count']}, Ratio={result['acridine_to_fitc_ratio']}"
         )
 
 
@@ -53,6 +55,13 @@ def circuit_board_qa(input_path: str):
         input_path=input_path,
         output_dir=output_dir,
     )
+
+    logging.info("Circuit board QA results")
+    logging.info(f"Total defects: {len(results)}")
+    logging.info("---------------------")
+
+    for i, message in enumerate(results):
+        logging.warning(f"Defect {i + 1}: {message}")
 
 
 @app.command()

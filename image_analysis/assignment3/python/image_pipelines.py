@@ -9,18 +9,18 @@ from image_utils import (
     calculate_gradients,
     calculate_signal_counts,
     check_border_touching,
+    determine_region_shape,
     fill_object_holes,
+    fix_salt_and_pepper_noise,
     label_connected_components,
     load_tiff_image,
     make_bottle_levels_plot,
     make_histogram,
     make_mean_intensity_plot,
-    median_filter,
     morphological_dilate,
     morphological_erode,
     pad_and_clip_angles,
     save_image,
-    # is_centered,
 )
 
 
@@ -108,58 +108,52 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
     image = load_tiff_image(input_path)
 
     # fix salt-and-pepper noise using median filtering
-    noise_mask = (image == 0) | (image == 255)
-    image_filtered = median_filter(image, kernel_size=1)
-    image[noise_mask] = image_filtered[noise_mask]
-
-    save_image(image, output_dir / "median_filtered_image.png")
+    image = fix_salt_and_pepper_noise(image, window_size=3)
+    save_image(image, output_dir / "image_denoised.png")
 
     image[image == Colour.SOLDERED_CONNECTION.value] = Colour.SOLDER.value
 
     holes_mask = image == Colour.HOLES.value
-    conductor_mask = (image == Colour.SOLDER.value) | holes_mask
+    solder_mask = (image == Colour.SOLDER.value) | holes_mask
 
-    conductor_mask_thick = morphological_erode(conductor_mask, kernel_size=5)
-    conductor_mask_thick = (
-        morphological_dilate(conductor_mask_thick, kernel_size=5) & conductor_mask
-    )
-    conductor_image = (conductor_mask_thick * 255).astype(np.uint8)
-    save_image(conductor_image, output_dir / "conductor_mask_thick.png")
+    solder_mask_thick = morphological_erode(solder_mask, kernel_size=5)
+    solder_mask_thick = morphological_dilate(solder_mask_thick, kernel_size=5)
+    solder_mask_thick = solder_mask_thick & solder_mask
+    save_image(solder_mask_thick, output_dir / "solder_mask_thick.png")
 
-    labeled_components, num_components = label_connected_components(conductor_mask)
+    labeled_components, num_components = label_connected_components(solder_mask)
     labeled_holes, num_holes = label_connected_components(holes_mask)
     holes_checked = np.zeros(num_holes + 1, dtype=bool)
 
-    # FIXME naming
+    # processed image for visualisation
     final_image = np.full((*image.shape, 3), Colour.SILICON.value, dtype=np.uint8)
-    for component_idx in range(1, num_components + 1):
-        component_mask = labeled_components == component_idx
+    final_image[solder_mask] = Colour.SOLDER.value + 16  # make traces slightly lighter
+    final_image[solder_mask_thick] = Colour.SOLDER.value
+    final_image[holes_mask] = Colour.HOLES.value
 
-        this_component_mask_thick = component_mask & conductor_mask_thick
-        # this_holes_mask = holes_mask & component_mask
+    results = []
+    for component_idx in range(1, num_components + 1):
+        this_component_mask = labeled_components == component_idx
+        this_component_mask_thick = this_component_mask & solder_mask_thick
 
         labeled_conductors, num_conductors = label_connected_components(
             this_component_mask_thick
         )
 
-        has_wires = (component_mask & (~this_component_mask_thick)).sum() > 0
-
-        final_image[component_mask, :] = Colour.SOLDER.value + 16  # make wires brighter
-        if has_wires and num_conductors < 2:
-            final_image[component_mask, 1:3] = 0  # set green, blue channels to 0
-            logging.warning(
+        has_traces = (this_component_mask & (~this_component_mask_thick)).sum() > 0
+        if has_traces and num_conductors < 2:
+            final_image[this_component_mask, 1:3] = 0  # set green, blue channels to 0
+            # TODO add x, y coordinates
+            results.append(
                 f"Component {component_idx} with suspected broken wire touches {num_conductors} connectors"
             )
 
-        final_image[this_component_mask_thick] = Colour.SOLDER.value
         # TODO check soldering regions
         for conductor_idx in range(1, num_conductors + 1):
-            this_this_conductor_mask = labeled_conductors == conductor_idx
-            dims = calculate_dimensions(this_this_conductor_mask)
+            this_this_solder_mask = labeled_conductors == conductor_idx
+            dims = calculate_dimensions(this_this_solder_mask)
             min_dim, max_dim = sorted(dims)
-            centroid = calculate_centroid(this_this_conductor_mask)
-            area = np.sum(this_this_conductor_mask)
-            fill_frac = area / (min_dim * max_dim)
+            centroid = calculate_centroid(this_this_solder_mask, min_dim, max_dim)
 
             if min_dim == 6 and max_dim == 9:
                 # component connector
@@ -169,12 +163,12 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                 continue
             elif min_dim == 17 and max_dim in (17, 20):
                 # soldering region
+                region_shape = determine_region_shape(this_this_solder_mask)
 
                 # TODO move to a function
-                expected_mask = np.zeros_like(this_this_conductor_mask)
+                expected_mask = np.zeros_like(this_this_solder_mask)
 
-                if fill_frac < 0.9:
-                    shape = "round"
+                if region_shape == "round":
                     expected_r = (241 / np.pi) ** 0.5
                     expected_mask[
                         np.linalg.norm(
@@ -185,7 +179,6 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                         < expected_r
                     ] = 1
                 else:
-                    shape = "square"
                     expected_w, expected_h = (20, 17)
                     y_mask = (
                         np.abs(np.arange(expected_mask.shape[0]) - centroid[0])
@@ -197,30 +190,30 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                     )
                     expected_mask[np.ix_(y_mask, x_mask)] = 1
 
-                intersection = np.sum(this_this_conductor_mask & expected_mask)
+                intersection = np.sum(this_this_solder_mask & expected_mask)
+                area = this_this_solder_mask.sum()
 
                 if intersection < max(area, expected_mask.sum()) * 0.99:
-                    final_image[this_this_conductor_mask, 1:3] = 0
-                    logging.warning(
-                        f"Component {component_idx}, {shape} soldering region {conductor_idx}, area: {area}, expected: {expected_mask.sum()}, intersection: {intersection}"
+                    final_image[this_this_solder_mask, 1:3] = 0
+                    results.append(
+                        f"Component {component_idx}, {region_shape} soldering region {conductor_idx}, area: {area}, expected: {expected_mask.sum()}, intersection: {intersection}"
                     )
 
                 holes_in_conductor = sorted(
-                    set(np.unique(labeled_holes[this_this_conductor_mask])) - {0}
+                    set(np.unique(labeled_holes[this_this_solder_mask])) - {0}
                 )
                 holes_checked[holes_in_conductor] = True
                 if len(holes_in_conductor) != 1:
-                    logging.warning(
-                        f"Component {component_idx}, {shape} soldering region {conductor_idx} has holes: {holes_in_conductor}"
+                    results.append(
+                        f"Component {component_idx}, {region_shape} soldering region {conductor_idx} has holes: {holes_in_conductor}"
                     )
                 else:
                     hole_mask = labeled_holes == holes_in_conductor[0]
-                    final_image[hole_mask] = Colour.HOLES.value
                     hole_centroid = calculate_centroid(hole_mask)
                     hole_dims = calculate_dimensions(hole_mask)
                     if hole_centroid != centroid:
-                        logging.warning(
-                            f"Component {component_idx}, {shape} soldering region {conductor_idx} centroid mismatch: {centroid} != {hole_centroid}"
+                        results.append(
+                            f"Component {component_idx}, {region_shape} soldering region {conductor_idx} centroid mismatch: {centroid} != {hole_centroid}"
                         )
                         final_image[hole_mask, 1:3] = 0
             else:
@@ -228,6 +221,8 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                 raise ValueError(f"Unknown region dimensions: {dims}")
 
     save_image(final_image, output_dir / "final_image.png")
+
+    return results
 
 
 def filled_bottles_pipeline(input_path: str, output_dir: str):
