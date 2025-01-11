@@ -1,8 +1,11 @@
 import logging
+from enum import Enum
 
 import numpy as np
 from image_utils import (
     apply_threshold,
+    calculate_centroid,
+    calculate_dimensions,
     calculate_gradients,
     calculate_signal_counts,
     check_border_touching,
@@ -17,9 +20,20 @@ from image_utils import (
     morphological_erode,
     pad_and_clip_angles,
     save_image,
-    # calculate_centroid,
     # is_centered,
 )
+
+
+class Colour(Enum):
+    FUSE_WIRE = 16
+    SOLDERING_REGIONS = 64
+    SOLDERED_CONNECTION = 80
+    WIRES = 64
+    MICROCONTROLLER = 176
+    HOLES = 240
+    # 80
+    # 96
+    # 128
 
 
 MIN_CELL_AREA = 100
@@ -51,34 +65,27 @@ def fish_signal_counts_pipeline(
     # fill holes in DAPI cells
     dapi_mask = fill_object_holes(dapi_mask)
 
+    # morphological erosion + dilation of cells
+    dapi_mask = morphological_erode(dapi_mask, kernel_size=5)
+    dapi_mask = morphological_dilate(dapi_mask, kernel_size=5)
+
     # label all connected components
     labeled_cells, num_cells = label_connected_components(dapi_mask)
     labeled_acridine, _ = label_connected_components(acridine_mask)
     labeled_fitc, _ = label_connected_components(fitc_mask)
 
+    dapi_image = np.zeros_like(dapi_mask, dtype=np.uint8)
     for cell_idx in range(1, num_cells + 1):
         cell_mask = labeled_cells == cell_idx
-
-        # temporarily remove cell from labeled image
-        labeled_cells[cell_mask] = 0
-        dapi_mask[cell_mask] = 0
-
-        # morphological erosion of cell mask
-        cell_mask = morphological_erode(cell_mask, kernel_size=2)
-        # morphological dilation of cell mask
-        cell_mask = morphological_dilate(cell_mask, kernel_size=2)
-
-        if not np.any(cell_mask):
-            continue
 
         # filter out incomplete cells on the image border
         is_touching_border = check_border_touching(cell_mask, axes=[0, 1])
         if is_touching_border:
             # half-intensity mask
-            dapi_mask[cell_mask] = 128
+            labeled_cells[cell_mask] = 0
+            dapi_image[cell_mask] = 128
         else:
-            labeled_cells[cell_mask] = cell_idx
-            dapi_mask[cell_mask] = 255
+            dapi_image[cell_mask] = 255
 
         # check for small cells
         cell_area = np.sum(cell_mask)
@@ -86,7 +93,10 @@ def fish_signal_counts_pipeline(
             logging.warning(f"Cell {cell_idx} has area {cell_area} < {MIN_CELL_AREA}.")
 
     # save binary masks
-    image = np.stack([dapi_mask, acridine_mask, fitc_mask], axis=-1)
+    image = np.stack(
+        [dapi_image, acridine_mask * 255, fitc_mask * 255],
+        axis=-1,
+    ).astype(np.uint8)
     save_image(image, output_dir / "binary_masks_cleaned.png")
 
     # calculate signal counts and ratios
@@ -105,60 +115,82 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
 
     save_image(image, output_dir / "median_filtered_image.png")
 
-#     # Thresholding to identify bright regions (drilled holes, soldering regions)
-#     threshold = np.percentile(image, 99)  # Bright regions threshold
-#     binary_image = image > threshold
+    image[image == Colour.SOLDERED_CONNECTION.value] = Colour.WIRES.value
 
-#     # # Display binary image
-#     # plt.figure(figsize=(8, 8))
-#     # plt.title("Binary Image (Bright Regions)")
-#     # plt.imshow(binary_image, cmap='gray')
-#     # plt.axis('off')
-#     # plt.show()
+    holes_mask = image == Colour.HOLES.value
+    conductor_mask = (image == Colour.WIRES.value) | holes_mask
 
-#     # Find connected components (regions)
-#     labeled_image, num_labels = label_connected_components(binary_image)
+    conductor_mask_thick = morphological_erode(conductor_mask, kernel_size=5)
+    conductor_mask_thick = (
+        morphological_dilate(conductor_mask_thick, kernel_size=5) & conductor_mask
+    )
+    conductor_image = (conductor_mask_thick * 255).astype(np.uint8)
+    save_image(conductor_image, output_dir / "conductor_mask_thick.png")
 
-#     logging.info(f"Number of detected regions: {num_labels}")
+    labeled_components, num_components = label_connected_components(conductor_mask)
 
-#     # Analyze regions for size, shape, and centering
-#     soldering_regions = []
-#     holes = []
+    # FIXME naming
+    final_image = np.zeros((*image.shape, 3), dtype=np.uint8)
+    for component_idx in range(1, num_components + 1):
+        component_mask = labeled_components == component_idx
 
-#     for region_idx in range(1, num_labels + 1):  # Exclude background (label 0)
-#         region_mask = labeled_image == region_idx
+        this_component_mask_thick = component_mask & conductor_mask_thick
+        this_holes_mask = holes_mask & component_mask
 
-#         # Region properties
-#         area = np.sum(region_mask)
-#         centroid = calculate_centroid(region_mask)
+        labeled_conductors, num_conductors = label_connected_components(
+            this_component_mask_thick
+        )
+        labeled_holes, num_holes = label_connected_components(this_holes_mask)
 
-#         # Classify region
-#         if area > 100:  # Example size threshold for soldering regions
-#             soldering_regions.append((region_idx, area, centroid))
-#         elif area <= 100:  # Example size threshold for drilled holes
-#             holes.append((region_idx, area, centroid))
+        has_wires = (component_mask & (~this_component_mask_thick)).sum() > 0
 
-#     logging.info("\nDetected soldering regions:")
-#     for idx, area, centroid in soldering_regions:
-#         logging.info(f"  Region {idx}: Area = {area}, Centroid = {centroid}")
+        final_image[component_mask, :] = 128
+        if has_wires and num_conductors < 2:
+            final_image[component_mask, 1:3] = 0  # set green, blue channels to 0
+            logging.warning(
+                f"Component {component_idx} with suspected broken wire touches {num_conductors} connectors"
+            )
 
-#     logging.info("\nDetected drilled holes:")
-#     for idx, area, centroid in holes:
-#         logging.info(f"  Hole {idx}: Area = {area}, Centroid = {centroid}")
+        final_image[this_component_mask_thick] = 255
+        # TODO check soldering regions
+        for conductor_idx in range(1, num_conductors + 1):
+            this_this_conductor_mask = labeled_conductors == conductor_idx
+            dims = calculate_dimensions(this_this_conductor_mask)
 
-#     # Check for centering of holes in soldering regions
-#     for hole_idx, _, hole_centroid in holes:
-#         centered = False
-#         for solder_idx, _, solder_centroid in soldering_regions:
-#             if is_centered(hole_centroid, solder_centroid):
-#                 centered = True
-#                 break
+            if dims[0] == 6 and dims[1] == 9:
+                # component connector
+                continue
+            elif dims[0] == 7 and dims[1] in (11, 12, 13):
+                # contact connector
+                continue
+            elif dims[0] == 17 and dims[1] in (17, 20):
+                # soldering region
+                final_image[this_this_conductor_mask, 0] = 0
+                final_image[this_this_conductor_mask, 2] = 0
 
-#         if not centered:
-#             logging.info(f"Warning: Hole {hole_idx} is not centered in any soldering region.")
+                centroid = calculate_centroid(this_this_conductor_mask)
+                area = np.sum(this_this_conductor_mask)
 
-#     # Check for broken wires (simple adjacency check)
-#     # This part is implementation-specific and will depend on the image details
+                # TODO move to a function
+                fill_frac = area / (dims[0] * dims[1])
+                if fill_frac < 0.9:
+                    # round
+                    pass
+                else:
+                    # square
+                    pass
+            else:
+                # catch and add to connector / soldering region
+                raise ValueError(f"Unknown region dimensions: {dims}")
+
+        final_image[this_holes_mask] = 64
+        # # TODO check if holes are centered
+        # for hole_idx in range(1, num_holes + 1):
+        #     pass
+
+        # logging.info(f"Component {component_idx}, conductors: {num_conductors}, holes: {num_holes}")
+
+    save_image(final_image, output_dir / "final_image.png")
 
 
 def filled_bottles_pipeline(input_path: str, output_dir: str):
@@ -183,7 +215,7 @@ def filled_bottles_pipeline(input_path: str, output_dir: str):
             continue
 
         # erode the edges a little to remove black borders
-        bottle_mask = morphological_erode(bottle_mask, kernel_size=2)
+        bottle_mask = morphological_erode(bottle_mask, kernel_size=5)
 
         # calculate row means
         row_means = np.ma.array(image, mask=~bottle_mask).mean(axis=1)

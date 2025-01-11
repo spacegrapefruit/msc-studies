@@ -19,15 +19,19 @@ def load_tiff_image(file_path: str) -> np.ndarray:
 
 
 def apply_threshold(image: object, threshold: int) -> np.ndarray:
-    return (image > threshold).astype(np.uint8) * 255
+    return image > threshold
 
 
 def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
     if isinstance(image, plt.Figure):
         image.savefig(file_path)
-    else:
-        cmap = "gray" if image.ndim == 2 else None
-        plt.imsave(file_path, image, cmap=cmap, vmin=0, vmax=255)
+        return
+
+    if image.dtype == bool:
+        image = (image * 255).astype(np.uint8)
+
+    cmap = "gray" if image.ndim == 2 else None
+    plt.imsave(file_path, image, cmap=cmap, vmin=0, vmax=255)
     logging.info(f"Saved image to {file_path}")
 
 
@@ -43,14 +47,15 @@ def flood_fill(binary_mask, labeled_image, x, y, label):
                     stack.append((nx, ny))
 
 
+# TODO check all array types (bool vs uint8)
 def fill_object_holes(binary_mask: np.ndarray) -> np.ndarray:
     binary_mask = binary_mask.copy()
-    padded_mask = np.pad(~binary_mask, 1, mode="constant", constant_values=255)
+    padded_mask = np.pad(~binary_mask, 1, mode="constant", constant_values=True)
     background_mask = np.zeros_like(padded_mask, dtype=bool)
 
     flood_fill(padded_mask, background_mask, 0, 0, True)
     background_mask = background_mask[1:-1, 1:-1]
-    binary_mask[~background_mask] = 255
+    binary_mask[~background_mask] = True
 
     return binary_mask
 
@@ -92,11 +97,47 @@ def median_filter(image: np.ndarray, kernel_size: int) -> np.ndarray:
 
 
 def morphological_dilate(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
-    return ~(median_filter(~binary_mask, kernel_size=2)).astype(bool)
+    rtop, rbottom = (kernel_size + 1) // 2, kernel_size // 2
+
+    padded_mask = np.zeros(
+        (binary_mask.shape[0] + kernel_size, binary_mask.shape[1] + kernel_size),
+        dtype=binary_mask.dtype,
+    )
+    padded_mask[rtop:-rbottom, rtop:-rbottom] = binary_mask
+
+    prefix_sum = padded_mask.cumsum(axis=0).cumsum(axis=1)
+
+    total_sum = (
+        prefix_sum[kernel_size:, kernel_size:]  # bottom-right corner
+        - prefix_sum[kernel_size:, :-kernel_size]  # bottom-left corner
+        - prefix_sum[:-kernel_size, kernel_size:]  # top-right corner
+        + prefix_sum[:-kernel_size, :-kernel_size]  # top-left corner
+    )
+
+    dilated_mask = (total_sum > 0).astype(binary_mask.dtype)
+    return dilated_mask
 
 
 def morphological_erode(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
-    return median_filter(binary_mask, kernel_size=2).astype(bool)
+    rtop, rbottom = (kernel_size + 1) // 2, kernel_size // 2
+
+    padded_mask = np.zeros(
+        (binary_mask.shape[0] + kernel_size, binary_mask.shape[1] + kernel_size),
+        dtype=binary_mask.dtype,
+    )
+    padded_mask[rtop:-rbottom, rtop:-rbottom] = binary_mask
+
+    prefix_sum = padded_mask.cumsum(axis=0).cumsum(axis=1)
+
+    total_sum = (
+        prefix_sum[kernel_size:, kernel_size:]  # bottom-right corner
+        - prefix_sum[kernel_size:, :-kernel_size]  # bottom-left corner
+        - prefix_sum[:-kernel_size, kernel_size:]  # top-right corner
+        + prefix_sum[:-kernel_size, :-kernel_size]  # top-left corner
+    )
+
+    eroded_mask = (total_sum == kernel_size * kernel_size).astype(binary_mask.dtype)
+    return eroded_mask
 
 
 def calculate_signal_counts(
@@ -232,10 +273,17 @@ def calculate_gradients(bottle_width: np.ndarray, step_size: int = 5):
 #     return edges
 
 
-# def calculate_centroid(region_mask):
-#     coords = np.argwhere(region_mask)
-#     centroid = np.mean(coords, axis=0)
-#     return tuple(centroid)
+def calculate_centroid(region_mask):
+    coords = np.argwhere(region_mask)
+    centroid = np.mean(coords, axis=0)
+    return tuple(centroid)
+
+
+def calculate_dimensions(binary_mask):
+    dim1 = (binary_mask.sum(axis=0) > 0).sum()
+    dim2 = (binary_mask.sum(axis=1) > 0).sum()
+    dims = sorted((dim1, dim2))
+    return dims
 
 
 # def is_centered(hole_centroid, solder_centroid, tolerance=5):
