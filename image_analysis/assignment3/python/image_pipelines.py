@@ -1,4 +1,5 @@
 import logging
+import warnings
 from enum import Enum
 
 import numpy as np
@@ -143,12 +144,12 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
         has_traces = (this_component_mask & (~this_component_mask_thick)).sum() > 0
         if has_traces and num_conductors < 2:
             final_image[this_component_mask, 1:3] = 0  # set green, blue channels to 0
-            # TODO add x, y coordinates
+            # TODO add y, x coordinates
             results.append(
                 f"Component {component_idx} with suspected broken wire touches {num_conductors} connectors"
             )
 
-        # TODO check soldering regions
+        # check soldering regions
         for conductor_idx in range(1, num_conductors + 1):
             this_this_solder_mask = labeled_conductors == conductor_idx
             dims = calculate_dimensions(this_this_solder_mask)
@@ -252,8 +253,14 @@ def filled_bottles_pipeline(input_path: str, output_dir: str):
         # calculate row means
         row_means = np.ma.array(image, mask=~bottle_mask).mean(axis=1)
         # TODO consider using 50-100 edge pixels
-        means_above = np.array([row_means[:i].mean() for i in range(1, len(row_means))])
-        means_below = np.array([row_means[i:].mean() for i in range(1, len(row_means))])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            means_above = np.array(
+                [row_means[:i].mean() for i in range(1, len(row_means))]
+            )
+            means_below = np.array(
+                [row_means[i:].mean() for i in range(1, len(row_means))]
+            )
         means_diff = np.nan_to_num(means_above - means_below, nan=0)
         liquid_level = np.argmax(means_diff)
 
@@ -302,7 +309,7 @@ def filled_bottles_pipeline(input_path: str, output_dir: str):
 
         results.append(
             {
-                "bottle_id": bottle_idx,
+                **dict(zip(["y", "x"], calculate_centroid(bottle_mask))),
                 "liquid_level": liquid_level,
                 "shoulder_level": shoulder_level,
                 "neck_level": neck_level,

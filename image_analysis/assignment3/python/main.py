@@ -20,6 +20,9 @@ def fish_signal_counts(
     input_path_fitc: str,
     input_path_dapi: str,
 ):
+    """
+    Counts the number of fish signals in a FISH image.
+    """
     output_dir = OUTPUT_DIR / "fish_signal_counts"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -37,8 +40,8 @@ def fish_signal_counts(
     logging.info(f"Total cells: {len(results)}")
     logging.info("---------------------")
 
-    for i, result in enumerate(results):
-        logging.info(f"Cell {i + 1}")
+    for i, result in enumerate(results, start=1):
+        logging.info(f"Cell {i}")
         logging.info(f"  X: {result['x']:.2f}, Y: {result['y']:.2f}")
         logging.info(f"  Area: {result['cell_area']}")
         logging.info(
@@ -48,6 +51,9 @@ def fish_signal_counts(
 
 @app.command()
 def circuit_board_qa(input_path: str):
+    """
+    Detects defects in a circuit board image.
+    """
     output_dir = OUTPUT_DIR / "circuit_board_qa"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -60,12 +66,15 @@ def circuit_board_qa(input_path: str):
     logging.info(f"Total defects: {len(results)}")
     logging.info("---------------------")
 
-    for i, message in enumerate(results):
-        logging.warning(f"Defect {i + 1}: {message}")
+    for i, message in enumerate(results, start=1):
+        logging.warning(f"Defect {i}: {message}")
 
 
 @app.command()
 def filled_bottles(input_path: str):
+    """
+    Detects filled bottles in an image.
+    """
     output_dir = OUTPUT_DIR / "filled_bottles"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -78,10 +87,14 @@ def filled_bottles(input_path: str):
     logging.info(f"Total bottles: {len(results)}")
     logging.info("---------------------")
 
-    for result in results:
+    for i, result in enumerate(results, start=1):
+        logging.info(f"Bottle {i}")
+        logging.info(f"  X: {result['x']:.2f}, Y: {result['y']:.2f}")
+        logging.info(f"  Liquid level: {result['liquid_level']}")
         logging.info(
-            f"Bottle {result['bottle_id']}: Liquid={result['liquid_level']}, Shoulder={result['shoulder_level']}, Neck={result['neck_level']}, Filled={result['is_filled']}"
+            f"  Neck-Shoulder range: {result['neck_level']}-{result['shoulder_level']}"
         )
+        logging.info(f"  Filled: {result['is_filled']}")
 
 
 if __name__ == "__main__":

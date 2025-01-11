@@ -2,12 +2,15 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
-from typing import Union
+from typing import Any, Union
 
 from libtiff import TIFF
 
 
 def load_tiff_image(file_path: str) -> np.ndarray:
+    """
+    Load a grayscale TIFF image from a file.
+    """
     tif = TIFF.open(file_path, mode="r")
     image = tif.read_image()
     tif.close()
@@ -18,11 +21,17 @@ def load_tiff_image(file_path: str) -> np.ndarray:
     return image
 
 
-def apply_threshold(image: object, threshold: int) -> np.ndarray:
+def apply_threshold(image: np.ndarray, threshold: int) -> np.ndarray:
+    """
+    Apply a threshold to a grayscale image.
+    """
     return image > threshold
 
 
 def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
+    """
+    Save an image to a file.
+    """
     if isinstance(image, plt.Figure):
         image.savefig(file_path)
         return
@@ -35,25 +44,33 @@ def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
     logging.info(f"Saved image to {file_path}")
 
 
-def flood_fill(binary_mask, labeled_image, x, y, label):
-    stack = [(x, y)]
+def flood_fill(
+    binary_mask: np.ndarray, labeled_image: np.ndarray, y: int, x: int, label: Any
+):
+    """
+    Flood-fill algorithm to label connected components in a binary mask.
+    Modifies the labeled_image in-place.
+    """
+    stack = [(y, x)]
     while stack:
-        cx, cy = stack.pop()
-        if binary_mask[cx, cy] and labeled_image[cx, cy] == 0:
-            labeled_image[cx, cy] = label
+        cy, cx = stack.pop()
+        if binary_mask[cy, cx] and labeled_image[cy, cx] == 0:
+            labeled_image[cy, cx] = label
             # 4-connectivity, consider 8-connectivity?
-            for nx, ny in [(cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)]:
-                if 0 <= nx < binary_mask.shape[0] and 0 <= ny < binary_mask.shape[1]:
-                    stack.append((nx, ny))
+            for ny, nx in [(cy - 1, cx), (cy + 1, cx), (cy, cx - 1), (cy, cx + 1)]:
+                if 0 <= ny < binary_mask.shape[0] and 0 <= nx < binary_mask.shape[1]:
+                    stack.append((ny, nx))
 
 
-# TODO check all array types (bool vs uint8)
 def fill_object_holes(binary_mask: np.ndarray) -> np.ndarray:
+    """
+    Fill holes inside binary objects in a binary mask.
+    """
     binary_mask = binary_mask.copy()
     padded_mask = np.pad(~binary_mask, 1, mode="constant", constant_values=True)
     background_mask = np.zeros_like(padded_mask, dtype=bool)
 
-    flood_fill(padded_mask, background_mask, 0, 0, True)
+    flood_fill(padded_mask, background_mask, 0, 0, label=True)
     background_mask = background_mask[1:-1, 1:-1]
     binary_mask[~background_mask] = True
 
@@ -61,20 +78,25 @@ def fill_object_holes(binary_mask: np.ndarray) -> np.ndarray:
 
 
 def label_connected_components(binary_mask: np.ndarray) -> np.ndarray:
+    """
+    Label connected components in a binary mask.
+    """
+    binary_mask = binary_mask.copy()  # not necessary but makes me sleep better
     labeled_image = np.zeros_like(binary_mask, dtype=np.int32)
     label = 0
-    rows, cols = binary_mask.shape
 
-    for x in range(cols):
-        for y in range(rows):
-            if binary_mask[y, x] and labeled_image[y, x] == 0:
-                label += 1
-                flood_fill(binary_mask, labeled_image, y, x, label)
+    for y, x in np.argwhere(binary_mask):
+        if labeled_image[y, x] == 0:
+            label += 1
+            flood_fill(binary_mask, labeled_image, y, x, label)
 
     return labeled_image, label
 
 
-def check_border_touching(binary_mask: np.ndarray, axes=[0, 1]) -> bool:
+def check_border_touching(binary_mask: np.ndarray, axes: list[int] = [0, 1]) -> bool:
+    """
+    Check if a binary mask is touching the image border.
+    """
     if 0 in axes and np.any(binary_mask[0, :] | binary_mask[-1, :]):
         return True
     if 1 in axes and np.any(binary_mask[:, 0] | binary_mask[:, -1]):
@@ -83,6 +105,11 @@ def check_border_touching(binary_mask: np.ndarray, axes=[0, 1]) -> bool:
 
 
 def median_filter(image: np.ndarray, window_size: int) -> np.ndarray:
+    """
+    Apply a median filter to an image
+    """
+    assert window_size % 2 == 1, "Window size must be odd."
+
     padded_image = np.pad(image, pad_width=window_size // 2, mode="edge")
 
     sliding_windows = np.lib.stride_tricks.sliding_window_view(
@@ -95,6 +122,10 @@ def median_filter(image: np.ndarray, window_size: int) -> np.ndarray:
 
 
 def morphological_dilate(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Apply morphological dilation to a binary mask.
+    Uses a square kernel but a very fast implementation.
+    """
     rtop, rbottom = (kernel_size + 1) // 2, kernel_size // 2
 
     padded_mask = np.zeros(
@@ -117,6 +148,10 @@ def morphological_dilate(binary_mask: np.ndarray, kernel_size: int) -> np.ndarra
 
 
 def morphological_erode(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Apply morphological erosion to a binary mask.
+    Uses a square kernel but a very fast implementation.
+    """
     rtop, rbottom = (kernel_size + 1) // 2, kernel_size // 2
 
     padded_mask = np.zeros(
@@ -142,7 +177,10 @@ def calculate_signal_counts(
     labeled_cells: np.ndarray,
     labeled_acridine: np.ndarray,
     labeled_fitc: np.ndarray,
-):
+) -> list[dict]:
+    """
+    Calculate the number of acridine and FITC signals in each cell.
+    """
     fitc_counts = np.zeros(np.max(labeled_cells) + 1)
     acridine_counts = np.zeros(np.max(labeled_cells) + 1)
 
@@ -188,6 +226,9 @@ def calculate_signal_counts(
 def make_histogram(
     image: np.ndarray, bins: int = 256, range: tuple = (0, 256), log_scale: bool = False
 ) -> plt.Figure:
+    """
+    Make a histogram plot of a grayscale image.
+    """
     histogram, _ = np.histogram(image, bins=bins, range=range)
 
     fig, ax = plt.subplots()
@@ -207,6 +248,9 @@ def make_mean_intensity_plot(
     means_below: np.ndarray,
     liquid_level: int,
 ) -> plt.Figure:
+    """
+    Make a plot of the mean intensity of rows in an image.
+    """
     fig, ax = plt.subplots(2, 1)
 
     ax[0].plot(row_means)
@@ -226,7 +270,10 @@ def make_bottle_levels_plot(
     liquid_level: int,
     shoulder_level: int,
     neck_level: int,
-):
+) -> plt.Figure:
+    """
+    Make a plot of the bottle width and angles at different levels.
+    """
     fig, ax = plt.subplots(2, 1, figsize=(8, 8))
     # plot bottle width
     ax[0].plot(bottle_width)
@@ -248,13 +295,21 @@ def make_bottle_levels_plot(
     return fig
 
 
-def pad_and_clip_angles(angles: np.ndarray, step_size: int = 5):
+def pad_and_clip_angles(angles: np.ndarray, step_size: int = 5) -> np.ndarray:
+    """
+    Pad and clip angles to avoid edge effects.
+    """
     angles = np.pad(angles, step_size, mode="constant", constant_values=0)
     angles = np.maximum(angles, 0)
     return angles
 
 
-def calculate_gradients(bottle_width: np.ndarray, step_size: int = 5):
+def calculate_gradients(
+    bottle_width: np.ndarray, step_size: int = 5
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the gradients of the bottle width.
+    """
     angle_top = np.arctan(
         (bottle_width[step_size:-step_size] - bottle_width[: -step_size * 2])
         / step_size
@@ -265,20 +320,30 @@ def calculate_gradients(bottle_width: np.ndarray, step_size: int = 5):
     return angle_top, angle_bottom
 
 
-def calculate_centroid(region_mask):
+def calculate_centroid(region_mask: np.ndarray) -> tuple:
+    """
+    Calculate the centroid of a region mask.
+    """
     coords = np.argwhere(region_mask)
     centroid = np.mean(coords, axis=0)
     return tuple(centroid)
 
 
-def calculate_dimensions(binary_mask):
+def calculate_dimensions(binary_mask: np.ndarray) -> tuple:
+    """
+    Calculate the dimensions of a binary mask.
+    """
     dim1 = (binary_mask.sum(axis=1) > 0).sum()
     dim2 = (binary_mask.sum(axis=0) > 0).sum()
     return (dim1, dim2)
 
 
-# TODO check all copy() calls
-def fix_salt_and_pepper_noise(image: np.ndarray, noise_values=(0, 255), window_size=3):
+def fix_salt_and_pepper_noise(
+    image: np.ndarray, noise_values: list[int] = [0, 255], window_size: int = 3
+) -> np.ndarray:
+    """
+    Fix salt-and-pepper noise in an image.
+    """
     image = image.copy()
     noise_mask = np.isin(image, noise_values)
     image_filtered = median_filter(image, window_size=window_size)
@@ -287,6 +352,9 @@ def fix_salt_and_pepper_noise(image: np.ndarray, noise_values=(0, 255), window_s
 
 
 def determine_region_shape(binary_mask, min_dim, max_dim):
+    """
+    Determine the shape of a soldering region mask (round or square).
+    """
     area = binary_mask.sum()
     fill_frac = area / (min_dim * max_dim)
 
