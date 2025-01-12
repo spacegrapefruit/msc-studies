@@ -1,5 +1,6 @@
 import logging
 import pathlib
+import shutil
 import typer
 
 from image_pipelines import (
@@ -24,6 +25,7 @@ def fish_signal_counts(
     Counts the number of fish signals in a FISH image.
     """
     output_dir = OUTPUT_DIR / "fish_signal_counts"
+    shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = fish_signal_counts_pipeline(
@@ -55,6 +57,7 @@ def circuit_board_qa(input_path: str):
     Detects defects in a circuit board image.
     """
     output_dir = OUTPUT_DIR / "circuit_board_qa"
+    shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = circuit_board_qa_pipeline(
@@ -78,6 +81,7 @@ def filled_bottles(input_path: str):
     Detects filled bottles in an image.
     """
     output_dir = OUTPUT_DIR / "filled_bottles"
+    shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = filled_bottles_pipeline(

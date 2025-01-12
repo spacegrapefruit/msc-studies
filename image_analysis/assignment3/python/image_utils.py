@@ -359,3 +359,37 @@ def determine_region_shape(binary_mask, min_dim, max_dim):
     fill_frac = area / (min_dim * max_dim)
 
     return "round" if fill_frac < 0.9 else "square"
+
+
+def make_expected_region_mask(
+    mask_shape: tuple[int, int],
+    shape_name: str,
+    centroid: tuple[int, int],
+    *,
+    radius: int = None,
+    height: int = None,
+    width: int = None,
+) -> np.ndarray:
+    """
+    Make an expected region mask for a soldering region.
+    """
+    expected_mask = np.zeros(mask_shape, dtype=bool)
+
+    if shape_name == "round":
+        assert radius is not None
+        expected_mask[
+            np.linalg.norm(
+                np.indices(expected_mask.shape) - np.expand_dims(centroid, axis=[1, 2]),
+                axis=0,
+            )
+            < radius
+        ] = 1
+    elif shape_name == "square":
+        assert height is not None and width is not None
+        y_mask = np.abs(np.arange(expected_mask.shape[0]) - centroid[0]) < height / 2
+        x_mask = np.abs(np.arange(expected_mask.shape[1]) - centroid[1]) < width / 2
+        expected_mask[np.ix_(y_mask, x_mask)] = 1
+    else:
+        raise ValueError("Invalid shape.")
+
+    return expected_mask

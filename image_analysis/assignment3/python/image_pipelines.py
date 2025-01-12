@@ -15,6 +15,7 @@ from image_utils import (
     label_connected_components,
     load_tiff_image,
     make_bottle_levels_plot,
+    make_expected_region_mask,
     make_histogram,
     make_mean_intensity_plot,
     morphological_dilate,
@@ -51,7 +52,10 @@ def fish_signal_counts_pipeline(
     threshold_acridine: int,
     threshold_fitc: int,
     threshold_dapi: int,
-):
+) -> list[dict]:
+    """
+    Detects cells in a fish image and calculates signal counts and ratios.
+    """
     # load images
     acridine_image = load_tiff_image(input_path_acridine)
     fitc_image = load_tiff_image(input_path_fitc)
@@ -109,7 +113,10 @@ def fish_signal_counts_pipeline(
     return results
 
 
-def circuit_board_qa_pipeline(input_path: str, output_dir: str):
+def circuit_board_qa_pipeline(input_path: str, output_dir: str) -> list[dict]:
+    """
+    Detects defects in a circuit board image.
+    """
     image = load_tiff_image(input_path)
 
     # fix salt-and-pepper noise using median filtering
@@ -166,42 +173,26 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                 continue
 
             # otherwise we're dealing with a soldering region
-            region_shape = determine_region_shape(region_mask, min_dim, max_dim)
+            region_shape_name = determine_region_shape(region_mask, min_dim, max_dim)
 
-            # TODO move to a function
-            expected_mask = np.zeros_like(region_mask)
-
-            if region_shape == "round":
-                expected_r = (241 / np.pi) ** 0.5
-                expected_mask[
-                    np.linalg.norm(
-                        np.indices(expected_mask.shape)
-                        - np.expand_dims(region_centroid, axis=[1, 2]),
-                        axis=0,
-                    )
-                    < expected_r
-                ] = 1
-            else:
-                expected_h, expected_w = (17, 20)
-                y_mask = (
-                    np.abs(np.arange(expected_mask.shape[0]) - region_centroid[0])
-                    < expected_h / 2
-                )
-                x_mask = (
-                    np.abs(np.arange(expected_mask.shape[1]) - region_centroid[1])
-                    < expected_w / 2
-                )
-                expected_mask[np.ix_(y_mask, x_mask)] = 1
+            expected_mask = make_expected_region_mask(
+                mask_shape=region_mask.shape,
+                shape_name=region_shape_name,
+                centroid=region_centroid,
+                radius=(241 / np.pi) ** 0.5,
+                height=17,
+                width=20,
+            )
 
             intersection = np.sum(region_mask & expected_mask)
             area = region_mask.sum()
 
-            if intersection < max(area, expected_mask.sum()) * 0.99:
+            if intersection < max(area, expected_mask.sum()) * 0.95:
                 final_image[region_mask, 1:3] = 0
                 results.append(
                     {
                         **dict(zip(["y", "x"], region_centroid)),
-                        "message": f"{region_shape} soldering region, area: {area}, expected: {expected_mask.sum()}, intersection: {intersection}",
+                        "message": f"{region_shape_name} soldering region, area: {area}, expected: {expected_mask.sum()}, intersection: {intersection}",
                     }
                 )
 
@@ -211,7 +202,7 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                 results.append(
                     {
                         **dict(zip(["y", "x"], region_centroid)),
-                        "message": f"{region_shape} soldering region has != 1 holes: {holes_in_region}",
+                        "message": f"{region_shape_name} soldering region has != 1 holes: {holes_in_region}",
                     }
                 )
                 continue
@@ -219,14 +210,22 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
             hole_mask = labeled_holes == holes_in_region[0]
             hole_centroid = calculate_centroid(hole_mask)
             hole_dims = calculate_dimensions(hole_mask)
-            expected_hole_dims = EXPECTED_REGION_HOLE_DIMS[region_shape]
+            expected_hole_dims = EXPECTED_REGION_HOLE_DIMS[region_shape_name]
+            expected_hole_mask = make_expected_region_mask(
+                mask_shape=hole_mask.shape,
+                shape_name=region_shape_name,
+                centroid=hole_centroid,
+                radius=(45 / np.pi) ** 0.5,
+                height=7,
+                width=10,
+            )
 
             if hole_centroid != region_centroid:
                 final_image[hole_mask, 1:3] = 0
                 results.append(
                     {
                         **dict(zip(["y", "x"], region_centroid)),
-                        "message": f"{region_shape} soldering region has hole at centroid: {hole_centroid}, expected: {region_centroid}",
+                        "message": f"{region_shape_name} soldering region has hole at centroid: {hole_centroid}, expected: {region_centroid}",
                     }
                 )
             if hole_dims not in expected_hole_dims:
@@ -234,7 +233,19 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
                 results.append(
                     {
                         **dict(zip(["y", "x"], hole_centroid)),
-                        "message": f"{region_shape} soldering region has hole with dimensions: {hole_dims}, expected one of: {expected_hole_dims}",
+                        "message": f"{region_shape_name} soldering region has hole with dimensions: {hole_dims}, expected one of: {expected_hole_dims}",
+                    }
+                )
+
+            intersection = np.sum(hole_mask & expected_hole_mask)
+            area = hole_mask.sum()
+
+            if intersection < max(area, expected_hole_mask.sum()) * 0.95:
+                final_image[hole_mask, 1:3] = 0
+                results.append(
+                    {
+                        **dict(zip(["y", "x"], hole_centroid)),
+                        "message": f"{region_shape_name} hole, area: {area}, expected: {expected_hole_mask.sum()}, intersection: {intersection}",
                     }
                 )
 
@@ -243,7 +254,10 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str):
     return results
 
 
-def filled_bottles_pipeline(input_path: str, output_dir: str):
+def filled_bottles_pipeline(input_path: str, output_dir: str) -> list[dict]:
+    """
+    Detects filled bottles in an image.
+    """
     image = load_tiff_image(input_path)
     final_image = np.zeros_like(image, dtype=np.uint8)
 
