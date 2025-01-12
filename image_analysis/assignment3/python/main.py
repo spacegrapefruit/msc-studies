@@ -66,8 +66,10 @@ def circuit_board_qa(input_path: str):
     logging.info(f"Total defects: {len(results)}")
     logging.info("---------------------")
 
-    for i, message in enumerate(results, start=1):
-        logging.warning(f"Defect {i}: {message}")
+    for i, result in enumerate(results, start=1):
+        logging.info(f"Defect {i}")
+        logging.info(f"  X: {result['x']:.2f}, Y: {result['y']:.2f}")
+        logging.info(f"  Message: {result['message']}")
 
 
 @app.command()
