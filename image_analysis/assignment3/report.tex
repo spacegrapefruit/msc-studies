@@ -18,11 +18,11 @@
 
 The report is structured into three sections, each of which describes a different application of image processing to a real-world problem.
 
-In \textbf{FISH Signal Counts}, we analyze fluorescence in situ hybridization (FISH) images to analyze mutations in tumor cells.
+In \textbf{FISH Signal Counts}, we analyze fluorescence in situ hybridization (FISH) images to detect and quantify genetic mutations in tumor cells. This involves identifying mutations using fluorescent probes and quantifying the signals to understand the mutation distribution within individual cells.
 
-In \textbf{Circuit Board Quality Assurance}, we analyze images of circuit boards to detect defects.
+In \textbf{Circuit Board Quality Assurance}, we analyze images of circuit boards to detect defects. This involves inspecting soldering regions, traces, and drilled holes using x-ray imaging and image processing techniques.
 
-In \textbf{Filled Bottles}, we analyze images of a production line to detect whether bottles are filled to the correct level.
+In \textbf{Filled Bottles}, we analyze images of a production line to detect whether bottles are filled to the correct level. This involves detecting the liquid level in bottles using edge detection and intensity analysis.
 
 \newpage
 
@@ -30,9 +30,178 @@ In \textbf{Filled Bottles}, we analyze images of a production line to detect whe
 
 \newpage
 
+\section{Theoretical Background}
+
+Understanding the real-world applications described in the next sections of this report requires familiarity with several key concepts in digital image processing. This section provides a brief overview of these concepts, namely colour fundamentals, thresholding, morphological operations, image segmentation, and connected components labeling.
+
+\subsection{Thresholding}
+
+Thresholding is a fundamental technique in digital image analysis used to separate objects of interest from the background. The process assigns a binary label to each pixel based on a predefined intensity level called the \emph{threshold}. Mathematically, for a grayscale image \(f(x, y)\) and a threshold \(T\), the thresholded image \(g(x, y)\) can be expressed as:
+
+\[
+g(x, y) = 
+\begin{cases}
+1, & \text{if } f(x, y) \geq T, \\
+0, & \text{otherwise}.
+\end{cases}
+\]
+
+Here, \(g(x, y)\) is referred to as a \emph{binary} image, where \(1\) typically denotes foreground (e.g. object of interest) and \(0\) denotes background. Depending on the application, the foreground can represent different elements (e.g. cells in a microscopy image or elements in a circuit board).
+
+This technique can be extended to \emph{multiple thresholding} where more than two classes are defined based on different intensity ranges. Mathematically, for \(n\) thresholds \(T_1, T_2, \ldots, T_n\), the thresholded image \(g(x, y)\) can be expressed as:
+
+\[
+g(x, y) =
+\begin{cases}
+1, & \text{if } f(x, y) \geq T_n, \\
+\vdots & \\
+n, & \text{if } T_{n-1} \leq f(x, y) < T_n, \\
+0, & \text{otherwise}.
+\end{cases}
+\]
+
+However, in the subsequent sections, we focus on the basic binary thresholding technique for simplicity and clarity.
+
+\subsubsection{Basic Global Thresholding}
+
+The simplest form of thresholding assumes a single, constant threshold \(T\) that partitions the image into two classes (background and foreground). To determine this threshold, one can examine the intensity histogram of the image. A straightforward approach is to choose \(T\) as the \emph{midpoint} between the average foreground and average background intensities, or use domain-specific heuristics.
+
+An improved version of basic global thresholding involves iterative selection:
+\begin{enumerate}
+    \item Select an initial estimate for the global threshold \(T\).
+    \item Segment the image into background and foreground using \(T\).
+    \item Compute the mean intensities \(\mu_b\) and \(\mu_f\) of the background and foreground classes, respectively.
+    \item Update \(T \leftarrow \frac{\mu_b + \mu_f}{2}\).
+    \item Repeat until \(T\) converges (i.e. the change \(\Delta T\) is below a predefined threshold).
+\end{enumerate}
+
+Although this method is simple, it often performs adequately if the intensity histogram is bimodal.
+
+\subsubsection{Optimal Global Thresholding}
+
+The basic global thresholding methods are intuitive but may not be optimal in all scenarios. They can be sensitive to noise, uneven illumination, or complex object-background distributions.
+
+Optimal global thresholding methods aim to find the threshold value \(T\) that best separates the classes in a statistical sense. Typically, this involves maximizing a criterion that quantifies class separability. For instance, one may minimize the overall misclassification error probability by modeling the intensities of the background and foreground with probability density functions (PDFs) and solving for the threshold that minimizes the error.
+
+\subsubsection{Otsu's Method}
+
+Otsu's method is a histogram-based thresholding approach that seeks to maximize the \emph{between-class variance} (or minimize the \emph{within-class variance}) of the thresholded image. Consider an image with an intensity histogram \(p(i)\), where \(i\) ranges over all possible intensity levels \(0 \leq i < L\). For a potential threshold \(T\), define:
+
+\[
+\omega_0(T) = \sum_{i=0}^{T-1} p(i), 
+\quad
+\omega_1(T) = \sum_{i=T}^{L-1} p(i),
+\]
+\[
+\mu_0(T) = \sum_{i=0}^{T-1} i \, p(i) / \omega_0(T), 
+\quad
+\mu_1(T) = \sum_{i=T}^{L-1} i \, p(i) / \omega_1(T).
+\]
+
+The total mean intensity is:
+\[
+\mu_T = \sum_{i=0}^{L-1} i \, p(i).
+\]
+
+The between-class variance \(\sigma_B^2(T)\) is:
+\[
+\sigma_B^2(T) = \omega_0(T) \left( \mu_0(T) - \mu_T \right)^2 
++ \omega_1(T) \left( \mu_1(T) - \mu_T \right)^2.
+\]
+
+Otsu's method exhaustively searches for the threshold \(T^*\) that maximizes \(\sigma_B^2(T)\). This method also performs well when the histogram exhibits clear foreground-background separation.
+
+\subsubsection{Some Considerations for Thresholding}
+
+Thresholding is a popular image segmentation technique because of its simplicity and effectiveness when the foreground and background intensities are well separated. It serves as a preprocessing step for numerous applications, such as object counting in microscopy images, industrial quality control, and document analysis.
+
+By focusing on separating background and foreground, thresholding simplifies more advanced tasks (e.g. morphological operations) and often leads to computational efficiency.
+
+However, as a simple technique, thresholding is sensitive to noise, illumination variations, and complex object-background distributions. For instance, non-uniform lighting can cause regions of the background to appear brighter or darker, leading to incorrect segmentation using a single global threshold. In practice, controlling or normalizing the illumination is often needed. Some common strategies to address these challenges include adaptive thresholding, smoothing, and edge detection.
+
+\subsubsection{Improving Global Thresholding}
+
+One strategy to improve global thresholding is to \emph{smooth} the image before applying the threshold. Common filters include:
+\begin{itemize}
+    \item \textbf{Gaussian smoothing}: Convolves the image with a Gaussian kernel to reduce high-frequency noise.
+    \item \textbf{Median filtering}: Replaces each pixel with the median of its neighborhood.
+\end{itemize}
+
+By reducing noise, the histogram becomes less distorted, which typically leads to a clearer separation between the foreground and background intensities.
+
+Another approach is to combine thresholding with edge information. Sharp intensity transitions, identified by edge detection filters (e.g. Sobel), mark the boundaries of objects. Integrating these boundaries helps refine the thresholding result:
+\begin{itemize}
+    \item \textbf{Post-processing}: After global thresholding, apply edge detection and correct misclassified regions near the edges.
+    \item \textbf{Pre-processing}: Use an edge map to guide the selection of local or global thresholds (e.g. adjusting \(T\) in areas with strong edges).
+\end{itemize}
+
+\subsubsection{Variable Thresholding}
+
+If the lighting or object intensity is not uniform across the entire image, a single global threshold can be inadequate. One solution is to \emph{partition} the image into subregions and apply a (potentially different) global threshold for each subregion. The subregions can be chosen based on:
+\begin{itemize}
+    \item \textbf{Regular grids}, i.e. dividing the image into blocks of fixed size.
+    \item \textbf{Adaptive segmentation} based on image properties (e.g. intensity gradients).
+\end{itemize}
+
+In this strategy, regions with similar illumination conditions can be thresholded more accurately, improving overall segmentation performance.
+
+In \emph{local thresholding}, the threshold at each pixel depends on local image properties, such as the mean or median intensity of its neighborhood. A common approach is to use a weighted sum of the local mean \(\mu_{x,y}\) and standard deviation \(\sigma_{x,y}\), where for each pixel \((x, y)\):
+
+\[
+T_{x,y} = a \cdot \sigma_{x,y} + b \cdot \mu_{x,y}.
+\]
+
+This allows the threshold to dynamically adapt to changes in illumination across the image. Such methods are especially effective in cases where the intensity varies gradually across the scene.
+
+In summary, thresholding is a cornerstone of image segmentation tasks, and the choice between global and local (adaptive) thresholding depends heavily on the application’s requirements and the nature of the illumination. Methods like Otsu's enable automatic selection of a global threshold, while local thresholding approaches offer robust solutions under challenging illumination conditions or non-uniform backgrounds.
+
+\subsection{Morphological Operations}
+
+Morphological operations are image processing techniques that probe and transform the structure of \emph{objects} within a binary image. Two primary morphological operations are \textit{erosion} and \textit{dilation}. These operations are often used in combination to refine object boundaries and eliminate noise.
+
+Two additional morphological operations are \textit{opening} and \textit{closing}. Opening is defined as an erosion followed by dilation, while closing is a dilation followed by erosion. These operations are useful for removing small objects and closing gaps in binary images.
+
+\subsubsection{Morphological Erosion}
+
+Erosion removes pixels on object boundaries, effectively shrinking objects in a binary image. It is defined by the minimum value of the neighborhood defined by a structuring element \( S \):
+
+\[
+I \ominus S (x, y) = \min \{ I(x + i, y + j) \mid (i, j) \in S \}
+\]
+
+Erosion is useful for eliminating small artifacts and separating closely connected objects.
+
+Oftentimes, a round structuring element is used to preserve the circular shape of objects during erosion. In this solution, a vectorized implementation of a square structuring element is used for computational efficiency.
+
+\subsubsection{Morphological Dilation}
+
+Dilation adds pixels to the boundaries of objects, expanding them in the image. It is defined by the maximum value of the neighborhood defined by a structuring element \( S \):
+
+\[
+I \oplus S (x, y) = \max \{ I(x - i, y - j) \mid (i, j) \in S \}
+\]
+
+Dilation is employed to close small holes and gaps within objects, ensuring more complete and connected structures. A combination of erosion and dilation operations can be used to refine object boundaries and enhance segmentation results.
+
+Similarly to erosion, a square structuring element is used for computational efficiency in the dilation operation.
+
+% TODO: Add more details on opening and closing operations.
+
+\subsection{Connected Components Labeling}
+
+Connected components labeling is a technique used to identify and label distinct objects within a binary image. Each connected group of foreground pixels is assigned a unique label, facilitating individual analysis of objects. This process involves scanning the binary image and grouping pixels based on connectivity criteria (usually 4-connectivity or 8-connectivity).
+
+Mathematically, let \( C \) be the set of connected components in a binary image \( I \). Each connected component \( c_k \in C \) is defined as:
+
+\[
+c_k = \{ (x, y) \mid I(x, y) = 1 \text{ and connected to } c_k \}
+\]
+
+Once labeled, various properties of each connected component, such as area, perimeter, and intensity, can be computed for further analysis.
+
 \section{FISH Signal Counts}
 
-\subsection{Theoretical Background}
+% Digital Image Analysis is a pivotal field in modern scientific research, enabling the extraction of meaningful information from images through computational techniques. In the realm of biological sciences, image analysis facilitates the quantification and visualization of cellular structures and molecular signals, which are essential for understanding complex biological processes. Techniques such as thresholding, morphological operations, and connected components labeling are fundamental in processing fluorescence microscopy images to detect and analyze cells and their associated signals. This report delves into a pipeline designed to detect cells in fluorescence images, apply necessary image processing techniques, and calculate signal counts and ratios, providing a comprehensive overview for beginners in digital image analysis.
 
 % Pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations. 
 
@@ -46,6 +215,68 @@ In \textbf{Filled Bottles}, we analyze images of a production line to detect whe
 % The combined imaging technique allows the simultaneous detection of genetic mutations and the spatial identification of cells. This method is essential for quantifying the occurrence and co-localization of mutations in individual cells.
 
 \subsection{Methodology}
+
+The process for detecting cells and calculating signal counts and ratios involves a series of steps:
+
+\subsubsection{Input Acquisition}
+
+The pipeline accepts three input images corresponding to different fluorescence channels:
+\begin{itemize}
+    \item \textbf{DAPI Channel}: Stains the cell nuclei, providing a reference for cell localization.
+    \item \textbf{Acridine Channel}: Highlights specific cellular components stained with Acridine.
+    \item \textbf{FITC Channel}: Represents signals from FITC-labeled molecules.
+\end{itemize}
+These images are loaded in TIFF format using the \texttt{load\_tiff\_image} function. The images are then combined into a single RGB image for visualization purposes: DAPI (red), Acridine (green), and FITC (blue).
+
+\subsubsection{Thresholding}
+
+% Each input image undergoes thresholding to create binary masks:
+% \begin{itemize}
+%     \item \textbf{DAPI Mask}: Generated by applying a threshold value \texttt{threshold\_dapi} to the DAPI image.
+%     \item \textbf{Acridine Mask}: Generated by applying \texttt{threshold\_acridine} to the Acridine image.
+%     \item \textbf{FITC Mask}: Generated by applying \texttt{threshold\_fitc} to the FITC image.
+% \end{itemize}
+% The \texttt{apply\_threshold} function implements the thresholding operation, converting grayscale images into binary masks based on the specified thresholds.
+
+\subsubsection{Saving Binary Masks}
+
+% The binary masks for DAPI, Acridine, and FITC channels are stacked along the last axis and saved as a composite image using the \texttt{save\_image} function. This provides a visual representation of the thresholded channels.
+
+\subsubsection{Morphological Operations}
+
+% To refine the detection of cells:
+% \begin{itemize}
+%     \item \textbf{Hole Filling}: The \texttt{fill\_object\_holes} function fills any holes within the DAPI mask, ensuring complete cell nuclei representation.
+%     \item \textbf{Erosion and Dilation}: The DAPI mask undergoes erosion followed by dilation using a kernel size of 5 pixels. These operations, implemented by \texttt{morphological\_erode} and \texttt{morphological\_dilate}, respectively, help in removing small artifacts and smoothing the boundaries of detected cells.
+% \end{itemize}
+
+\subsubsection{Connected Components Labeling}
+
+Post morphological processing, connected components labeling is applied:
+\begin{itemize}
+    \item \textbf{Labeling Cells}: The cleaned DAPI mask is labeled using \texttt{label\_connected\_components}, identifying individual cells.
+    \item \textbf{Labeling Signals}: Similarly, Acridine and FITC masks are labeled.
+\end{itemize}
+
+\subsubsection{Border Touching and Cell Filtering}
+
+% Each labeled cell is examined to determine if it touches the image borders using the \texttt{check\_border\_touching} function:
+% \begin{itemize}
+%     \item Cells touching the border are considered incomplete and are marked with half-intensity in the DAPI image.
+%     \item Cells not touching the border are fully marked.
+%     \item Additionally, cells with an area smaller than a predefined minimum (\texttt{MIN\_CELL\_AREA}) are identified and logged as potential artifacts.
+% \end{itemize}
+
+\subsubsection{Signal Counting}
+
+The number of Acridine and FITC signals within each cell is counted using the \texttt{calculate\_signal\_counts} function. This function iterates over each labeled cell and computes the number of signals present in the corresponding Acridine and FITC masks.
+
+% \subsubsection{Final Binary Masks and Signal Calculation}
+
+% % The refined binary masks are saved as \texttt{binary\_masks\_cleaned.png}. Finally, the \texttt{calculate\_signal\_counts} function computes the signal counts and ratios for each labeled cell, producing a list of dictionaries containing the results.
+
+
+
 
 % The analysis involves the following steps:
 % \begin{enumerate}
@@ -78,23 +309,63 @@ In \textbf{Filled Bottles}, we analyze images of a production line to detect whe
 
 \subsection{Results}
 
-% The analysis provided a detailed summary of FISH signal counts for each segmented cell. Table~\ref{tab:results} summarizes the findings:
+Terminal command to run the analysis:
 
-% \begin{table}[h!]
-% \centering
-% \caption{FISH Signal Counts and Ratios for DAPI-Segmented Cells}
-% \label{tab:results}
-% \begin{tabular}{|c|c|c|c|}
-% \hline
-% \textbf{Cell ID} & \textbf{Acridine Count} & \textbf{FITC Count} & \textbf{Acridine/FITC Ratio} \\ \hline
-% 1 & 5 & 3 & 1.67 \\ \hline
-% 2 & 2 & 4 & 0.50 \\ \hline
-% 3 & 6 & 6 & 1.00 \\ \hline
-% ... & ... & ... & ... \\ \hline
-% \end{tabular}
-% \end{table}
+\begin{lstlisting}[language=bash]
+$ $python python/main.py fish-signal-counts \
+    input_path_acridine \
+    input_path_fitc \
+    input_path_dapi
+\end{lstlisting}
 
-% The results enable pathologists to better understand the distribution and relationship between Acridine and FITC mutations within individual tumor cells. This quantitative insight supports the development of precise, mutation-specific treatment strategies.
+Here, the \texttt{input\_path\_acridine}, \texttt{input\_path\_fitc}, and \texttt{input\_path\_dapi} are the file paths to the Acridine, FITC, and DAPI images, respectively. In this analysis, we processed the provided sample images \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_Acridine.tif}, \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_FITC.tif}, and \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_DAPI.tif}.
+
+\subsection{Binary Mask Visualization}
+
+Figure~\ref{fig:cell_binary_masks} presents the initial binary masks generated from the DAPI, Acridine, and FITC channels. The masks effectively isolate the nuclei and signal regions, providing a clear basis for subsequent analysis.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/fish_signal_counts/binary_masks.png}
+    \caption{Initial Binary Masks for DAPI (red channel), Acridine (green channel), and FITC (blue channel).}
+    \label{fig:cell_binary_masks}
+\end{figure}
+
+Figure~\ref{fig:cell_binary_masks_cleaned} shows the cleaned binary masks after morphological operations and filtering. The processed masks exhibit well-defined cell boundaries and reduced noise, facilitating accurate signal quantification. Cells that touch the image borders are marked with half-intensity.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/fish_signal_counts/binary_masks_cleaned.png}
+    \caption{Cleaned Binary Masks after Morphological Operations.}
+    \label{fig:cell_binary_masks_cleaned}
+\end{figure}
+
+\subsection{Signal Counts and Ratios}
+
+The pipeline successfully identified and labeled individual cells, enabling the calculation of Acridine and FITC signal counts within each cell. The program identifies 30 complete cells in the provided sample images and computes the signal counts and ratios for each cell.
+
+Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells.
+
+\begin{table}[h]
+    \centering
+    \caption{Signal Counts and Ratios per Cell}
+    \label{tab:results}
+    \begin{tabular}{|c|c|c|c|c|c|}
+        \hline
+        \textbf{Cell ID} & \textbf{Centroid (X, Y)} & \textbf{Area (pixels)} & \textbf{Acridine} & \textbf{FITC} & \textbf{Acridine/FITC} \\
+        \hline
+        1 & (586.82, 19.07) & 841 & 1 & 0 & - \\
+        2 & (497.55, 45.82) & 5015 & 3 & 2 & 1.50 \\
+        3 & (44.79, 60.05) & 4161 & 2 & 2 & 1.00 \\
+        \ldots & \ldots & \ldots & \ldots & \ldots & \ldots \\
+        30 & (530.05, 691.11) & 3332 & 2 & 1 & 2.00 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% The results demonstrate the efficacy of the pipeline in accurately detecting cells and quantifying fluorescence signals. The morphological operations effectively refined the binary masks, ensuring precise cell boundaries and minimizing artifacts. The signal counts and ratios provide valuable insights into the distribution and intensity of Acridine and FITC signals within individual cells, which can be instrumental in various biological analyses.
+
+% This report presented a comprehensive pipeline for digital image analysis aimed at detecting cells in fluorescence microscopy images and quantifying associated signals. By leveraging thresholding, morphological operations, and connected components labeling, the pipeline effectively segments and analyzes cellular structures. The methodology facilitates accurate signal quantification, offering valuable data for biological research. Future enhancements could include automated threshold selection and integration of more advanced image processing techniques to further improve accuracy and efficiency.
 
 \newpage
 
@@ -119,12 +390,12 @@ In \textbf{Filled Bottles}, we analyze images of a production line to detect whe
 %     \item **Preprocessing**: 
 %     \begin{itemize}
 %         \item Convert the x-ray image to grayscale (if not already) for intensity-based analysis.
-%         \item Apply noise reduction techniques (e.g., Gaussian blurring) to enhance image clarity.
+%         \item Apply noise reduction techniques (e.g. Gaussian blurring) to enhance image clarity.
 %     \end{itemize}
     
 %     \item **Feature Extraction**:
 %     \begin{itemize}
-%         \item Detect soldering regions using edge detection algorithms (e.g., Canny edge detection).
+%         \item Detect soldering regions using edge detection algorithms (e.g. Canny edge detection).
 %         \item Identify drilled holes as regions of maximum brightness.
 %     \end{itemize}
     
