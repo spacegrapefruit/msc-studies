@@ -1,5 +1,6 @@
 \documentclass[a4paper,12pt]{article}
 
+\usepackage{amsfonts}
 \usepackage{amsmath}
 \usepackage{float}
 \usepackage{graphicx}
@@ -155,64 +156,156 @@ This allows the threshold to dynamically adapt to changes in illumination across
 
 In summary, thresholding is a cornerstone of image segmentation tasks, and the choice between global and local (adaptive) thresholding depends heavily on the application’s requirements and the nature of the illumination. Methods like Otsu's enable automatic selection of a global threshold, while local thresholding approaches offer robust solutions under challenging illumination conditions or non-uniform backgrounds.
 
-\subsection{Morphological Operations}
+\subsection{Mathematical Morphology}
 
-Morphological operations are image processing techniques that probe and transform the structure of \emph{objects} within a binary image. Two primary morphological operations are \textit{erosion} and \textit{dilation}. These operations are often used in combination to refine object boundaries and eliminate noise.
+% Mathematical morphology is a branch of image processing that focuses on the analysis and manipulation of structures within an image using concepts from set theory. In binary image analysis, an image is viewed as a set of coordinates (in \(\mathbb{Z}^2\)) for which the corresponding pixels are 1 (foreground). Morphological operations probe this image with a simpler shape or pattern called a \emph{structuring element}, allowing us to extract meaningful information about the shape and structure of objects.
 
-Two additional morphological operations are \textit{opening} and \textit{closing}. Opening is defined as an erosion followed by dilation, while closing is a dilation followed by erosion. These operations are useful for removing small objects and closing gaps in binary images.
+% % Morphological operations are image processing techniques that probe and transform the structure of \emph{objects} within a binary image. Two primary morphological operations are \textit{erosion} and \textit{dilation}. These operations are often used in combination to refine object boundaries and eliminate noise.
 
-\subsubsection{Morphological Erosion}
+% % Two additional morphological operations are \textit{opening} and \textit{closing}. Opening is defined as an erosion followed by dilation, while closing is a dilation followed by erosion. These operations are useful for removing small objects and closing gaps in binary images.
 
-Erosion removes pixels on object boundaries, effectively shrinking objects in a binary image. It is defined by the minimum value of the neighborhood defined by a structuring element \( S \):
+\subsubsection{Fundamentals}
+
+% The cornerstone of mathematical morphology lies in its interpretation of an image as a set. Typically, for a binary image, the \emph{foreground} pixels form a set \(A \subset \mathbb{Z}^2\). Morphological operations then transform \(A\) in specific ways based on another set called the \emph{structuring element}, \(B \subset \mathbb{Z}^2\). By examining how \(A\) interacts with \(B\), morphological operations can expand or shrink objects, remove noise, fill holes, and extract relevant features.
+
+\subsubsection{Sets and Set Operations}
+
+Since images and structuring elements are treated as sets, we will rely on basic set operations:
+\begin{itemize}
+    \item \emph{Union} (\(\cup\)): The union of two sets \(A\) and \(B\) is the set of points in either \(A\) or \(B\).
+    \item \emph{Intersection} (\(\cap\)): The intersection of two sets \(A\) and \(B\) is the set of points that are in both \(A\) and \(B\).
+    \item \emph{Complement} (\(A^c\)): The complement of \(A\) contains all points not in \(A\).
+    \item \emph{Difference} (\(\setminus\)): The difference of two sets \(A \setminus C\) contains points in \(A\) but not in \(B\).
+\end{itemize}
+
+\subsubsection{Structuring Elements}
+
+A structuring element \(B\) is typically a small, simple set (e.g., a \(3 \times 3\) square) that probes the image for the morphological operation. In two-dimensional images, we often represent \(B\) by its \emph{origin} (the reference point, frequently in the center). For any point in 2D integer space \((x, y) \in \mathbb{Z}^2\), the translation of \(B\) by \((x, y)\) is denoted
+\[
+  B_{(x,y)} = \{(b_x + x, b_y + y) : (b_x, b_y) \in B \}.
+\]
+The choice of structuring element depends on the desired operation. Smaller structuring elements provide fine details, whereas larger ones capture coarse structures.
+
+\subsubsection{Morphological Erosion and Dilation}
+
+\emph{Erosion} shrinks the foreground set by removing boundary pixels. Formally, the erosion of \(A\) by \(B\) is defined by:
+\[
+  A \ominus B = \{\,z : B_{z} \subseteq A \},
+\]
+where \(B_z\) is the structuring element \(B\) translated so that its origin is at \(z\). In essence, a point \(z\) remains in the eroded set only if the entire structuring element \(B\) translated to \(z\) fits inside \(A\).
+
+Erosion is useful for eliminating small artifacts and separating closely connected objects. Often, a round structuring element is used to preserve the circular shape of objects during erosion. In this solution however, a vectorized implementation of a square structuring element is used for computational efficiency.
+
+In contrast, \emph{dilation} grows the foreground set by adding pixels around object boundaries. It is defined by:
 
 \[
-I \ominus S (x, y) = \min \{ I(x + i, y + j) \mid (i, j) \in S \}
+  A \oplus B = \{\,z : (B^R)_{z} \cap A \neq \emptyset \},
 \]
-
-Erosion is useful for eliminating small artifacts and separating closely connected objects.
-
-Oftentimes, a round structuring element is used to preserve the circular shape of objects during erosion. In this solution, a vectorized implementation of a square structuring element is used for computational efficiency.
-
-\subsubsection{Morphological Dilation}
-
-Dilation adds pixels to the boundaries of objects, expanding them in the image. It is defined by the maximum value of the neighborhood defined by a structuring element \( S \):
-
+where \(B^R\) is the reflection of \(B\) about its origin:
 \[
-I \oplus S (x, y) = \max \{ I(x - i, y - j) \mid (i, j) \in S \}
+  B^R = \{(-b_x, -b_y) : (b_x, b_y) \in B \}.
 \]
+Geometrically, a point \(z\) is included if, when we place the origin of \(B^R\) at \(z\), there is at least one overlap with the set \(A\).
 
-Dilation is employed to close small holes and gaps within objects, ensuring more complete and connected structures. A combination of erosion and dilation operations can be used to refine object boundaries and enhance segmentation results.
+Dilation is employed to close small holes and gaps within objects, ensuring more complete and connected structures. Similarly to erosion, a square structuring element is used for computational efficiency in this solution.
 
-Similarly to erosion, a square structuring element is used for computational efficiency in the dilation operation.
+\subsubsection{Morphological Opening and Closing}
 
-% TODO: Add more details on opening and closing operations.
+Two notable combinations of erosion and dilation are:
+\begin{itemize}
+    \item \textbf{Opening} (\(A \circ B\)) = \((A \ominus B) \oplus B\). Opening smooths object boundaries and removes small objects or thin protrusions.
+    \item \textbf{Closing} (\(A \bullet B\)) = \((A \oplus B) \ominus B\). Closing fills small gaps and connects nearby objects.
+\end{itemize}
 
-\subsection{Connected Components Labeling}
+\subsubsection{Boundary Extraction}
 
-Connected components labeling is a technique used to identify and label distinct objects within a binary image. Each connected group of foreground pixels is assigned a unique label, facilitating individual analysis of objects. This process involves scanning the binary image and grouping pixels based on connectivity criteria (usually 4-connectivity or 8-connectivity).
-
-Mathematically, let \( C \) be the set of connected components in a binary image \( I \). Each connected component \( c_k \in C \) is defined as:
-
+The \emph{boundary} (or contour) of a set \(A\) can be extracted by subtracting the eroded version of \(A\) from \(A\) itself:
 \[
-c_k = \{ (x, y) \mid I(x, y) = 1 \text{ and connected to } c_k \}
+  \text{Boundary}(A) = A \setminus (A \ominus B),
 \]
+where \(B\) is a simple structuring element (e.g., a \(3 \times 3\) disk). This operation highlights the edges or boundaries of the objects in the image.
 
-Once labeled, various properties of each connected component, such as area, perimeter, and intensity, can be computed for further analysis.
+\subsubsection{Hole Filling}
+
+\emph{Hole filling} is used to fill in background regions that are surrounded by foreground in a binary image. One approach is to choose a seed point in each hole (often on the border of the hole) and iteratively perform dilations constrained to the complement of the original image until convergence. Alternatively, set-based morphological algorithms can fill holes by complement operations:
+\[
+  \text{Fill}(A) = \left( \bigcup_{n=0}^{\infty} (X_n \oplus B) \cap A^c \right)^c,
+\]
+where \(X_0\) is a seed point outside the hole region and we iteratively add all connected background pixels that can be reached via the structuring element.
+
+\subsubsection{Connected Component Extraction}
+
+Connected component extraction aims to isolate each group of connected foreground pixels (usually using 4- or 8-connectivity) from the rest of the image. A common approach uses iterative morphological operations:
+
+\begin{enumerate}
+    \item Choose a single seed point \( X_0 \subseteq A \) (e.g., any foreground pixel in the component of interest).
+    \item Define a connectivity structuring element \(B\) (for 4-connectivity, \(B\) might be a \(3\times 3\) cross; for 8-connectivity, a \(3\times 3\) square).
+    \item Iteratively \emph{dilate} the current set of connected pixels and \emph{intersect} the result with the original set \(A\). Formally:
+    \[
+      X_{k+1} = \bigl( X_k \oplus B \bigr) \cap A, \quad k = 0, 1, 2, \ldots
+    \]
+    \item Stop when no more changes occur, i.e., \( X_{k+1} = X_k \). At this point, \(X_k\) corresponds exactly to the connected component in \(A\) that contains the seed point.
+\end{enumerate}
+
+By repeating this procedure with new seeds on remaining unextracted parts of the foreground, one can isolate every connected component in the image. Note that this approach does not assign labels to the components, it merely identifies which pixels in \(A\) belong to the same connected structure.
+
+\subsubsection{Hit-or-Miss Transformation}
+
+% The \emph{hit-or-miss} transformation detects a specific pattern in the image by looking for the arrangement of foreground and background pixels. Given two structuring elements \(B_1\) (defining foreground shape) and \(B_2\) (defining background shape), the hit-or-miss transform of \(A\) is:
+% \[
+%   A \otimes (B_1, B_2) = (A \ominus B_1) \cap (A^c \ominus B_2).
+% \]
+% Here, \((B_1, B_2)\) is placed at a candidate point, and if \(B_1\) fits inside \(A\) (hit) and simultaneously \(B_2\) fits inside \(A^c\) (miss), that point is considered a valid detection.
+
+\subsubsection{``Free'' Coefficients}
+
+% In some contexts, ``free'' coefficients refer to additional parameters in morphological structuring or adaptive filters that are not fixed \emph{a priori}. For example, in certain adaptive morphological filters, the size or shape of the structuring element might vary depending on local image properties. These free coefficients must be estimated or optimized based on the desired outcome (e.g., preserving certain structures while removing noise).
+
+\subsubsection{Convex Hull}
+
+% The \emph{convex hull} of a set \(A\) in the plane is the smallest convex set that contains \(A\). Morphologically, one can approximate or compute the convex hull by iteratively applying dilation with a specific set of structuring elements (often line segments in several directions) until no further growth is possible. If the result is denoted by \(\mathrm{CH}(A)\), then:
+% \[
+%   \mathrm{CH}(A) = \bigcap \{\,C : A \subseteq C \,\wedge\, C \text{ is convex} \}.
+% \]
+
+\subsubsection{Thinning}
+
+% \emph{Thinning} reduces the thickness of objects to produce a skeletal representation. Formally, thinning is an iterative process of removing boundary points that do not break the connectivity or essential structure of the object. One approach is:
+% \[
+%   \text{Thin}(A) = A \setminus \bigcup_i \bigl( A \otimes (B_1^i, B_2^i) \bigr),
+% \]
+% where \((B_1^i, B_2^i)\) are a sequence of hit-or-miss structuring elements (rotated versions to remove boundary points from all directions). The iterative process stops when no more points can be removed.
+
+\subsubsection{Thickening}
+
+% \emph{Thickening} is the dual of thinning and is used to gradually enlarge the objects from within in a controlled way. Similar to thinning, it can be expressed in terms of hit-or-miss transforms:
+% \[
+%   \text{Thicken}(A) = A \cup \bigcup_i \bigl( A^c \otimes (B_1^i, B_2^i) \bigr)^c.
+% \]
+% Here, we aim to fill in gaps in objects without overly dilating them in all directions at once.
+
+% \bigskip
+% In conclusion, mathematical morphology offers a powerful and intuitive toolkit for shape analysis and processing of binary images. By carefully selecting the structuring element and combining operations (such as erosion, dilation, opening, and closing), we can efficiently transform and interpret image structures for tasks like boundary detection, object segmentation, hole filling, thinning, and more. 
+
+
+
+
+
 
 \section{FISH Signal Counts}
 
-% Digital Image Analysis is a pivotal field in modern scientific research, enabling the extraction of meaningful information from images through computational techniques. In the realm of biological sciences, image analysis facilitates the quantification and visualization of cellular structures and molecular signals, which are essential for understanding complex biological processes. Techniques such as thresholding, morphological operations, and connected components labeling are fundamental in processing fluorescence microscopy images to detect and analyze cells and their associated signals. This report delves into a pipeline designed to detect cells in fluorescence images, apply necessary image processing techniques, and calculate signal counts and ratios, providing a comprehensive overview for beginners in digital image analysis.
+% In the realm of biological sciences, image analysis facilitates the quantification and visualization of cellular structures and molecular signals, which are essential for understanding complex biological processes. Techniques such as thresholding, morphological operations, and connected components labeling are fundamental in processing fluorescence microscopy images to detect and analyze cells and their associated signals. This report delves into a pipeline designed to detect cells in fluorescence images, apply necessary image processing techniques, and calculate signal counts and ratios, providing a comprehensive overview for beginners in digital image analysis.
 
-% Pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations. 
+Pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations.
 
-% These fluorescent labels are visualized using fluorescence microscopy, where each label emits light at specific wavelengths corresponding to the attached probe. For example:
+These fluorescent labels are visualized using fluorescence microscopy, where each label emits light at specific wavelengths corresponding to the attached probe.
 % \begin{itemize}
 %     \item \textbf{Acridine} (visualized as red) marks one genetic mutation.
 %     \item \textbf{FITC} (visualized as green) marks another genetic mutation.
 %     \item \textbf{DAPI} (visualized as blue) stains cell nuclei to define cell boundaries.
 % \end{itemize}
 
-% The combined imaging technique allows the simultaneous detection of genetic mutations and the spatial identification of cells. This method is essential for quantifying the occurrence and co-localization of mutations in individual cells.
+The combined imaging technique allows the simultaneous detection of genetic mutations and the spatial identification of cells. This method is essential for quantifying the occurrence and co-localization of mutations in individual cells.
 
 \subsection{Methodology}
 
