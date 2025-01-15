@@ -557,7 +557,7 @@ FITC or Acridine signals that are not contained within a labeled cell are logged
 Terminal command to run the analysis:
 
 \begin{lstlisting}[language=bash]
-$ $python python/main.py fish-signal-counts \
+$ python python/main.py fish-signal-counts \
     <input_path_acridine> \
     <input_path_fitc> \
     <input_path_dapi>
@@ -681,8 +681,6 @@ Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells
 %     \end{itemize}
 % \end{enumerate}
 
-\subsection{Results}
-
 % The algorithm was applied to the provided x-ray image of the circuit board. The following observations and results were obtained:
 % \begin{itemize}
 %     \item **Soldering Regions**: All soldering regions were detected and measured. 95\% of regions matched the desired size and shape, with minor deviations in a few regions flagged for inspection.
@@ -690,6 +688,82 @@ Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells
 %     \item **Connection Wires**: Connectivity analysis revealed two broken wires, which were highlighted for corrective action. All other connections were intact and properly linked.
 % \end{itemize}
 % These results demonstrate the effectiveness of the algorithm in identifying key quality assurance metrics, enabling targeted improvements in the circuit board production process.
+
+\subsection{Running the Analysis}
+
+Terminal command to run the analysis:
+
+\begin{lstlisting}[language=bash]
+$ python python/main.py circuit-board-qa \
+    <input_path>
+\end{lstlisting}
+
+Here, the \texttt{input\_path} is the file paths to the x-ray image of the circuit board. In this analysis, we processed the provided sample image:
+
+\begin{lstlisting}[language=bash]
+$ python python/main.py circuit-board-qa \
+    "data/input/pcb-xray.tif"
+\end{lstlisting}
+
+\subsection{Results}
+
+\subsubsection{Visualizations of Intermediate Steps}
+
+Figure~\ref{fig:image_raw} shows the raw x-ray image of the circuit board. The image contains salt-and-pepper noise, which can obscure internal structures and components.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/circuit_board_qa/image_raw.png}
+    \caption{Raw X-ray Image of the Circuit Board.}
+    \label{fig:image_raw}
+\end{figure}
+
+Figure~\ref{fig:image_denoised} shows the denoised x-ray image of the circuit board after applying the median filter. The image is now clearer, with salt-and-pepper noise removed, enhancing the visibility of internal structures.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/circuit_board_qa/image_denoised.png}
+    \caption{Denoised X-ray Image of the Circuit Board.}
+    \label{fig:image_denoised}
+\end{figure}
+
+Figure~\ref{fig:final_image} shows the final image with detected defects highlighted in red. The soldering regions, drilled holes, and connection wires are clearly visible, with broken connections, wrong-sized soldering regions, and misaligned holes flagged for inspection.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/circuit_board_qa/final_image.png}
+    \caption{Cleaned Binary Masks after Morphological Operations.}
+    \label{fig:final_image}
+\end{figure}
+
+\subsubsection{List of Detected Defects}
+
+The complete list of defects detected in the circuit board image is printed in the terminal output. We provide a summary of the defects in Table~\ref{tab:defects}.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Detected Defects in the Circuit Board}
+    \label{tab:defects}
+    \begin{tabular}{|c|c|p{0.6\linewidth}|}
+        \hline
+        \textbf{Defect ID} & \textbf{Location (X, Y)} & \textbf{Description} \\
+        \hline
+        1 & (58.00, 11.00) & Round soldering region has hole at centroid: (14.0, 55.0), expected: (11.0, 58.0) \\
+        2 & (141.45, 23.79) & Suspected broken wire touches 1 != 2 connectors \\
+        3 & (115.00, 23.00) & Round soldering region has hole at centroid: (22.0, 116.0), expected: (23.0, 115.0) \\
+        4 & (155.07, 30.42) & Suspected broken wire touches 1 != 2 connectors \\
+        5 & (87.00, 36.00) & Round soldering region has hole at centroid: (36.95, 86.07), expected: (36.0, 87.0) \\
+        6 & (180.70, 85.88) & Suspected broken wire touches 1 != 2 connectors \\
+        7 & (209.50, 112.46) & Suspected broken wire touches 1 != 2 connectors \\
+        8 & (44.00, 187.00) & Round soldering region has hole at centroid: (184.0, 44.0), expected: (187.0, 44.0) \\
+        9 & (58.97, 245.02) & Round soldering region has hole at centroid: (244.0, 58.0), expected: (245.02, 58.97) \\
+        10 & (112.50, 245.00) & Round soldering region, area: 292, expected: 242, intersection: 242 \\
+        11 & (112.50, 245.00) & Round soldering region has hole at centroid: (245.0, 111.75), expected: (245.0, 112.5) \\
+        12 & (111.75, 245.00) & Round soldering region has hole with dimensions: (7, 9), expected: (7, 7) \\
+        13 & (111.75, 245.00) & Round hole, area: 55, expected: 44, intersection: 44 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \newpage
 

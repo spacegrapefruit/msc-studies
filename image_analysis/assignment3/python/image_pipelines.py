@@ -135,6 +135,7 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str) -> list[dict]:
     Detects defects in a circuit board image.
     """
     image = load_tiff_image(input_path)
+    save_image(image, output_dir / "image_raw.png")
 
     # fix salt-and-pepper noise using median filtering
     image = fix_salt_and_pepper_noise(image, window_size=3)
