@@ -530,12 +530,12 @@ In order to refine the detection of cells:
     \item \textbf{Morphological Opening}: The DAPI mask undergoes morphological opening using a square kernel of size \(5 \times 5\). This operation, implemented by \texttt{morphological\_open}, helps in smoothing the cell boundaries and removing small artifacts.
 \end{itemize}
 
-\paragraph{Connected Components Labeling}
+\paragraph{Connected Components Extraction}
 
-Post morphological processing, connected components labeling is applied:
+Post morphological processing, connected components extraction is applied on each binary mask independently to identify individual cells and signals:
 \begin{itemize}
-    \item \textbf{Labeling Cells}: The cleaned DAPI mask is labeled using \texttt{label\_connected\_components}, identifying individual cells.
-    \item \textbf{Labeling Signals}: Similarly, Acridine and FITC masks are labeled.
+    \item \textbf{Detecting Cells}: The cleaned DAPI mask is labeled using \texttt{label\_connected\_components}, identifying individual cells.
+    \item \textbf{Detecting Signals}: Similarly, Acridine and FITC masks are labeled.
 \end{itemize}
 
 \paragraph{Border Touching and Cell Filtering}
@@ -630,64 +630,86 @@ Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells
 
 \section{Application: Circuit Board Quality Assurance}
 
-% Digital image processing is an essential tool in quality assurance tasks, especially in domains where precision and automation play a critical role. X-ray imaging provides a non-invasive method for analyzing internal structures of objects, enabling detailed inspection of features that are otherwise concealed. 
-
-% In the context of circuit board manufacturing, x-ray imaging is utilized to inspect soldering regions, drilled holes, and component connections. The fundamental principles applied include:
-% \begin{itemize}
-%     \item **Intensity Analysis**: Analyzing pixel intensity variations to detect features like drilled holes or overlapping components.
-%     \item **Edge Detection**: Identifying the boundaries of soldering regions and components to assess size and shape.
-%     \item **Connectivity Analysis**: Determining the integrity of connection wires and ensuring proper linkage between components and connectors.
-% \end{itemize}
-% These techniques rely on pre-defined thresholds and pattern recognition algorithms to automate defect detection and minimize human error.
+In the electronics industry, circuit board manufacturing requires stringent quality control to ensure the reliability and functionality of electronic devices. X-ray imaging is a common non-destructive technique used to inspect circuit boards for defects such as soldering issues, misalignments, and broken connections. This application focuses on analyzing an x-ray image of a circuit board to assess the quality of soldering regions, drilled holes, and connection traces.
 
 \subsection{Methodology}
 
-% To evaluate the quality of the circuit board from the x-ray image, the following steps are employed:
-% \begin{enumerate}
-%     \item **Preprocessing**: 
-%     \begin{itemize}
-%         \item Convert the x-ray image to grayscale (if not already) for intensity-based analysis.
-%         \item Apply noise reduction techniques (e.g. Gaussian blurring) to enhance image clarity.
-%     \end{itemize}
-    
-%     \item **Feature Extraction**:
-%     \begin{itemize}
-%         \item Detect soldering regions using edge detection algorithms (e.g. Canny edge detection).
-%         \item Identify drilled holes as regions of maximum brightness.
-%     \end{itemize}
-    
-%     \item **Soldering Region Analysis**:
-%     \begin{itemize}
-%         \item Measure the size and shape of soldering regions using contour detection.
-%         \item Compare measurements against predefined tolerances for correctness.
-%     \end{itemize}
-    
-%     \item **Hole Positioning**:
-%     \begin{itemize}
-%         \item Determine the centroids of drilled holes.
-%         \item Verify alignment with soldering region centers by calculating the Euclidean distance.
-%     \end{itemize}
-    
-%     \item **Connectivity Assessment**:
-%     \begin{itemize}
-%         \item Trace connection wires to ensure continuity between regions and connectors.
-%         \item Flag broken or missing connections using graph traversal methods.
-%     \end{itemize}
-    
-%     \item **Validation**:
-%     \begin{itemize}
-%         \item Cross-reference automated results with a small subset of manually reviewed samples.
-%         \item Adjust thresholds and parameters based on validation findings.
-%     \end{itemize}
-% \end{enumerate}
+\paragraph{Input Acquisition}
 
-% The algorithm was applied to the provided x-ray image of the circuit board. The following observations and results were obtained:
-% \begin{itemize}
-%     \item **Soldering Regions**: All soldering regions were detected and measured. 95\% of regions matched the desired size and shape, with minor deviations in a few regions flagged for inspection.
-%     \item **Drilled Holes**: The centroids of all drilled holes were calculated and compared to the soldering region centers. 98\% of holes were correctly positioned, with a maximum offset of 0.2 mm in flagged cases.
-%     \item **Connection Wires**: Connectivity analysis revealed two broken wires, which were highlighted for corrective action. All other connections were intact and properly linked.
-% \end{itemize}
-% These results demonstrate the effectiveness of the algorithm in identifying key quality assurance metrics, enabling targeted improvements in the circuit board production process.
+The analysis begins with loading the x-ray image of the circuit board in TIFF format using the \texttt{load\_tiff\_image} function. The image has a single channel representing the intensity of the x-ray signal.
+
+\paragraph{Preprocessing}
+
+The x-ray image undergoes preprocessing to enhance the quality of the image:
+\begin{itemize}
+    \item \textbf{Noise Reduction}: Median filtering is applied to remove salt-and-pepper noise from the x-ray image. The \texttt{fix\_salt\_and\_pepper\_noise} function implements this operation by replacing pixels with extreme values \((0, 255)\) with the median of neighboring pixels.
+    \item \textbf{Standardization}: It is known that soldered connections appear brighter than the rest of the traces. Soldered connections are brought to the same intensity level as the rest of the traces to treat these regions uniformly.
+\end{itemize}
+
+\paragraph{Mask Generation}
+
+Two binary masks are generated based on the known color categories in the image:
+\begin{itemize}
+    \item \textbf{Holes Mask}: Produced by comparing image pixels to the value \texttt{PCBColour.HOLES}. Any pixel in the image designated as a hole location is marked as \texttt{True} (1), forming the \emph{holes mask}.
+    \item \textbf{Solder Mask}: Created by combining pixels labeled as \texttt{PCBColour.SOLDER} or \texttt{PCBColour.HOLES} into one composite mask. This merged mask facilitates analysis of all solder-bearing components, including holes.
+\end{itemize}
+
+\paragraph{Morphological Opening}
+
+To eliminate thin traces or extraneous noise, the pipeline applies a morphological opening on the solder mask via \texttt{morphological\_open}:
+\begin{itemize}
+    \item A kernel size of \(5 \times 5\) ensures that small spurious connections or traces are removed, effectively \emph{thickening} true solder connections and consolidating them.
+    \item The resulting `thick solder' mask is then combined (logical AND) with the original solder mask to preserve only those regions that are consistently present in both masks, i.e. connectors and soldering regions, but not the PCB traces.
+\end{itemize}
+
+\paragraph{Connected Components Extraction}
+
+Connected components labeling is performed on both the solder mask and the holes mask:
+\begin{itemize}
+    \item \textbf{Label Solder Regions}: The \texttt{label\_connected\_components} function detects all connected components in the `thick' solder mask, assigning a unique ID to each component.
+    \item \textbf{Label Holes}: Similarly, hole regions are labeled in the holes mask. Each hole is assigned a unique ID.
+\end{itemize}
+
+\paragraph{Visualization Setup}
+
+To produce a final color visualization of the defect analysis, an RGB image \texttt{final\_image} is initialized and populated consistently with the original x-ray image:
+\begin{itemize}
+    \item All background pixels default to mid-intensity grey.
+    \item Pixels belonging to the solder mask are colored darker, with an additional slight intensity shift for the `thick' solder mask.
+    \item Holes are colored white, ensuring high contrast against soldered areas.
+\end{itemize}
+This visualization enables a quick review of the pipeline's interpretation of the circuit board layout.
+
+\paragraph{Component Inspection and Trace Integrity}
+
+The pipeline iterates over each labeled solder component. For each component:
+\begin{enumerate}
+    \item \textbf{Centroid Calculation}: The centroid of the component is computed.
+    \item \textbf{Sub-Region Labeling}: A label operation on the `thick' solder mask identifies further subdivisions (connectors, soldering regions) within the component.
+    \item \textbf{Trace Continuity}: If the component exhibits a `thin' sub-region (i.e. a wire-like trace) that is connected (i.e. is part of the same connected component) to a single connector or soldering region, the pipeline flags a \textit{suspected broken trace}. This is done by coloring the region in red tones and appending a diagnostic message such as \texttt{Suspected broken trace touches 1 != 2 connectors}.
+\end{enumerate}
+
+\paragraph{Solder Region Assessment}
+
+Solder sub-regions (excluding traces) are then classified based on their dimensions and shape:
+\begin{enumerate}
+    \item \textbf{Size Calculation}: The area of each solder sub-region is computed. If the dimensions are below a predefined threshold, the region is classified as a connector and not considered further.
+    \item \textbf{Shape Determination}: For larger solder objects, we infer whether a sub-region is a circle or rectangle. This is done by measuring its minimal and maximal dimensions, and determining the fill percentage of the bounding box. If the sub-region is large, and the fill percentage is greater than 90\%, the region is classified as a rectangular soldering region; otherwise, it is considered a circular one.
+    \item \textbf{Expected Mask Creation}: For each recognized soldering region shape, we generate a template mask representing an ideal solder region of the same centroid, size, and shape.
+    \item \textbf{Intersection Checking}: The degree of overlap between the actual region and the expected region is computed. If they differ by more than \(5\%\), the pipeline highlights that region in red and logs a message detailing the mismatch in area and intersection.
+\end{enumerate}
+
+\paragraph{Hole Analysis}
+
+Each solder sub-region should contain exactly one hole. After identifying the hole(s) within a solder region:
+\begin{itemize}
+    \item \textbf{Hole Count}: The pipeline checks how many hole labels intersect with the sub-region. If this count is not exactly one, a warning is generated indicating an anomaly (e.g., missing hole, extra holes).
+    \item \textbf{Hole Dimensions and Position}: Hole centroids and dimensions are evaluated similarly to solder regions. The pipeline creates a corresponding \emph{expected hole} mask, verifying shape and size. Deviations in centroid location or dimensions produce warning messages and these discrepancies are highlighted visually in the final image.
+\end{itemize}
+
+\paragraph{Final Output}
+
+Upon completing the inspections, the final image is saved, reflecting all colored overlays indicating solder coverage, holes, and flagged defects.
 
 \subsection{Running the Analysis}
 
@@ -727,7 +749,7 @@ Figure~\ref{fig:image_denoised} shows the denoised x-ray image of the circuit bo
     \label{fig:image_denoised}
 \end{figure}
 
-Figure~\ref{fig:final_image} shows the final image with detected defects highlighted in red. The soldering regions, drilled holes, and connection wires are clearly visible, with broken connections, wrong-sized soldering regions, and misaligned holes flagged for inspection.
+Figure~\ref{fig:final_image} shows the final image with detected defects highlighted in red. The soldering regions, drilled holes, and connection traces are clearly visible, with broken connections, wrong-sized soldering regions, and misaligned holes flagged for inspection.
 
 \begin{figure}[!htbp]
     \centering
@@ -738,7 +760,7 @@ Figure~\ref{fig:final_image} shows the final image with detected defects highlig
 
 \subsubsection{List of Detected Defects}
 
-The complete list of defects detected in the circuit board image is printed in the terminal output. We provide a summary of the defects in Table~\ref{tab:defects}.
+The complete list of defects detected in the circuit board image is printed in the terminal output. For each defect, the pipeline provides the defect ID, location (X, Y), and a description of the issue. We provide a summary of the defects in Table~\ref{tab:defects}.
 
 \begin{table}[!htbp]
     \centering
@@ -749,12 +771,12 @@ The complete list of defects detected in the circuit board image is printed in t
         \textbf{Defect ID} & \textbf{Location (X, Y)} & \textbf{Description} \\
         \hline
         1 & (58.00, 11.00) & Round soldering region has hole at centroid: (14.0, 55.0), expected: (11.0, 58.0) \\
-        2 & (141.45, 23.79) & Suspected broken wire touches 1 != 2 connectors \\
+        2 & (141.45, 23.79) & Suspected broken trace touches 1 != 2 connectors \\
         3 & (115.00, 23.00) & Round soldering region has hole at centroid: (22.0, 116.0), expected: (23.0, 115.0) \\
-        4 & (155.07, 30.42) & Suspected broken wire touches 1 != 2 connectors \\
+        4 & (155.07, 30.42) & Suspected broken trace touches 1 != 2 connectors \\
         5 & (87.00, 36.00) & Round soldering region has hole at centroid: (36.95, 86.07), expected: (36.0, 87.0) \\
-        6 & (180.70, 85.88) & Suspected broken wire touches 1 != 2 connectors \\
-        7 & (209.50, 112.46) & Suspected broken wire touches 1 != 2 connectors \\
+        6 & (180.70, 85.88) & Suspected broken trace touches 1 != 2 connectors \\
+        7 & (209.50, 112.46) & Suspected broken trace touches 1 != 2 connectors \\
         8 & (44.00, 187.00) & Round soldering region has hole at centroid: (184.0, 44.0), expected: (187.0, 44.0) \\
         9 & (58.97, 245.02) & Round soldering region has hole at centroid: (244.0, 58.0), expected: (245.02, 58.97) \\
         10 & (112.50, 245.00) & Round soldering region, area: 292, expected: 242, intersection: 242 \\

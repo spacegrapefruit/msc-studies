@@ -176,7 +176,7 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str) -> list[dict]:
             results.append(
                 {
                     **dict(zip(["y", "x"], component_centroid)),
-                    "message": f"Suspected broken wire touches {num_regions} != 2 connectors",
+                    "message": f"Suspected broken trace touches {num_regions} != 2 connectors",
                 }
             )
 
