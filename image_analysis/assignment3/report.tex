@@ -39,6 +39,74 @@ In \textbf{Application: Filled Bottles}, we analyze images of a production line 
 
 Understanding the real-world applications described in the next sections of this report requires familiarity with several key concepts in digital image processing. This section provides a brief overview of these concepts.
 
+\subsection{Colour Image Processing}
+
+In digital images, colour is commonly represented by three components, denoted as \(R\), \(G\), and \(B\) for the red, green, and blue channels respectively. Each pixel \((x, y)\) in a colour image \(f\) can thus be expressed as:
+\[
+f(x, y) = \bigl(R(x, y),\, G(x, y),\, B(x, y)\bigr).
+\]
+Each channel captures intensity information for its respective colour. The range of each intensity value typically spans from 0 to 255 in 8-bit images, or can be extended for higher bit-depth images. Colour perception in imaging is based on an \emph{additive} mixture of these channels.
+
+\subsubsection{Pseudo Colour Image Processing}
+
+Pseudo colour (or false colour) image processing is a technique that maps intensity values of a grayscale image to a colour map. The goal is to improve the perception or interpretability of certain image structures. For instance, a temperature map might be converted to a spectrum ranging from blue (cool) to red (hot).
+
+Mathematically, let \(I\) be a grayscale image with pixel intensities in the range \([0, 1]\). A pseudo colour function \(\Phi\) maps each intensity to a triplet of colour values:
+\[
+\Phi: [0,1] \rightarrow \mathbb{R}^3, \quad I(x,y) \mapsto (R, G, B).
+\]
+
+\subsubsection{Full Colour Image Processing}
+
+Full colour image processing involves manipulating or analyzing images in their three-channel (or multi-channel) format. Typical tasks include:
+
+\begin{itemize}
+    \item \textbf{Colour Enhancement}: Adjusting brightness, contrast, or gamma in one or more channels to improve visual quality.
+    \item \textbf{Colour Balancing}: Correcting or normalizing images, for example by imposing white balance to ensure a neutral background.
+    \item \textbf{Segmentation and Object Recognition}: Using features in the colour space to isolate objects (e.g., detecting green plants against a darker background in an agricultural scene).
+\end{itemize}
+
+The general colour transformation in full colour image processing can be expressed as:
+\[
+\begin{bmatrix}
+R' \\
+G' \\
+B'
+\end{bmatrix}
+=
+\begin{bmatrix}
+r_{11} & r_{12} & r_{13} \\
+r_{21} & r_{22} & r_{23} \\
+r_{31} & r_{32} & r_{33}
+\end{bmatrix}
+\begin{bmatrix}
+R \\
+G \\
+B
+\end{bmatrix}
++
+\begin{bmatrix}
+r_{10} \\
+r_{20} \\
+r_{30}
+\end{bmatrix},
+\]
+where the matrix \([r_{ij}]\) and vector \([r_{i0}]\) represent the transformation coefficients.
+
+\subsubsection{Noise in Colour Images}
+
+Noise in colour images can arise from various sources such as sensor electronics or lighting conditions. Unlike grayscale images, where noise typically appears as isolated intensity fluctuations, noise in colour images can affect each channel differently - or not at all. Models of noise include:
+
+\begin{itemize}
+    \item \textbf{Additive Gaussian Noise (AGN)}: Often assumed in raw sensor data, where each channel \(c \in \{R, G, B\}\) is contaminated by independent Gaussian noise \(n_c\).
+    \[
+    c_{noisy}(x,y) = c_{true}(x,y) + n_c(x,y), \quad n_c \sim \mathcal{N}(0,\,\sigma^2).
+    \]
+    \item \textbf{Salt-and-Pepper Noise}: Prevalent in digital transmission errors or faulty pixels, leading to random instances of maximum or minimum intensity in each channel.
+\end{itemize}
+
+Denoising methods for colour images often extend grayscale techniques (e.g., median or Gaussian filters) to each channel separately or adopt vector-based approaches to better preserve chromatic relationships.
+
 \subsection{Thresholding}
 
 Thresholding is a fundamental technique in digital image analysis used to separate objects of interest from the background. The process assigns a binary label to each pixel based on a predefined intensity level called the \emph{threshold}. Mathematically, for a grayscale image \(f(x, y)\) and a threshold \(T\), the thresholded image \(g(x, y)\) can be expressed as:
@@ -65,7 +133,7 @@ n, & \text{if } T_{n-1} \leq f(x, y) < T_n, \\
 \end{cases}
 \]
 
-However, in the subsequent sections, we focus on the basic binary thresholding technique for simplicity and clarity.
+However, in the subsequent material, we focus on the basic binary thresholding technique for simplicity and clarity.
 
 \subsubsection{Basic Global Thresholding}
 
@@ -160,6 +228,14 @@ This allows the threshold to dynamically adapt to changes in illumination across
 
 In summary, thresholding is a cornerstone of image segmentation tasks, and the choice between global and local (adaptive) thresholding depends heavily on the application’s requirements and the nature of the illumination. Methods like Otsu's enable automatic selection of a global threshold, while local thresholding approaches offer robust solutions under challenging illumination conditions or non-uniform backgrounds.
 
+\subsubsection{Multivariable Thresholding}
+
+Thresholding is often extended to more than one channel or feature dimension. For instance, in color images using RGB channels, a pixel \((R, G, B)\) is included in a segment if:
+\begin{equation}
+    |R - \mu_R| < T_R, \quad |G - \mu_G| < T_G, \quad |B - \mu_B| < T_B,
+\end{equation}
+where \((\mu_R, \mu_G, \mu_B)\) and \((T_R, T_G, T_B)\) denote the mean intensity and thresholds in each channel, respectively. More sophisticated approaches can use e.g. joint probability distributions or feature vectors.
+
 \subsection{Mathematical Morphology}
 
 Mathematical morphology is a branch of image processing that focuses on the analysis and manipulation of structures within an image using concepts from set theory. A binary image \(A\) is viewed as a set of pixel coordinates in 2D integer space \(\mathbb{Z}^2\) for which the corresponding pixels are 1 (foreground) or 0 (background). Morphological operations probe this image with a simpler shape or pattern \(B \subset \mathbb{Z}^2\) called a \emph{structuring element}. By examining how \(A\) interacts with \(B\), morphological operations can expand or shrink objects, remove noise, fill holes, and extract relevant features.
@@ -176,7 +252,7 @@ Since images and structuring elements are treated as sets, we will rely on basic
 
 \subsubsection{Structuring Elements}
 
-A structuring element \(B\) is typically a small, simple set (e.g., a \(3 \times 3\) square) that probes the image for the morphological operation. In two-dimensional images, we often represent \(B\) by its \emph{origin} (the reference point, frequently in the center). For any point in 2D integer space \((x, y) \in \mathbb{Z}^2\), the translation of \(B\) by \((x, y)\) is denoted
+A structuring element \(B\) is typically a small, simple set (e.g. a \(3 \times 3\) square) that probes the image for the morphological operation. In two-dimensional images, we often represent \(B\) by its \emph{origin} (the reference point, frequently in the center). For any point in 2D integer space \((x, y) \in \mathbb{Z}^2\), the translation of \(B\) by \((x, y)\) is denoted
 \[
   B_{(x,y)} = \{(b_x + x, b_y + y) : (b_x, b_y) \in B \}.
 \]
@@ -219,7 +295,7 @@ The \emph{boundary} (or contour) of a set \(A\) can be extracted by subtracting 
 \[
   \text{Boundary}(A) = A \setminus (A \ominus B),
 \]
-where \(B\) is a simple structuring element (e.g., a \(3 \times 3\) disk). This operation highlights the edges or boundaries of the objects in the image.
+where \(B\) is a simple structuring element (e.g. a \(3 \times 3\) disk). This operation highlights the edges or boundaries of the objects in the image.
 
 \subsubsection{Hole Filling}
 
@@ -234,7 +310,7 @@ where \(X_0\) is a seed point outside the hole region and we iteratively add all
 Connected component extraction aims to isolate each group of connected foreground pixels (usually using 4- or 8-connectivity) from the rest of the image. A common approach uses iterative morphological operations:
 
 \begin{enumerate}
-    \item Choose a single seed point \( X_0 \subseteq A \) (e.g., any foreground pixel in the component of interest).
+    \item Choose a single seed point \( X_0 \subseteq A \) (e.g. any foreground pixel in the component of interest).
     \item Define a connectivity structuring element \(B\) (for 4-connectivity, \(B\) might be a \(3\times 3\) cross; for 8-connectivity, a \(3\times 3\) square).
     \item Iteratively \emph{dilate} the current set of connected pixels and \emph{intersect} the result with the original set \(A\). Formally:
     \[
@@ -261,26 +337,37 @@ Hit-or-miss transforms are useful for detecting specific patterns or structures 
 
 Image segmentation is the process of partitioning a digital image into multiple segments (sets of pixels) to simplify its representation and make it more meaningful for analysis. It enables further operations such as object recognition, tracking, and scene understanding. This section provides an overview of segmentation techniques, focusing on point, line, and edge detection, edge linking, region growing, and thresholding.
 
-% Segmentation strategies generally aim to group pixels with similar features (e.g., intensity, color, texture) or to separate dissimilar ones. Two predominant approaches are:
-% \begin{itemize}
-%     \item \textbf{Discontinuity-based methods}: Segment images by detecting sudden changes in intensity or color (edges).
-%     \item \textbf{Similarity-based methods}: Segment images by grouping regions with homogeneous properties (e.g., region growing, thresholding).
-% \end{itemize}
-% In the following sections, we discuss different techniques associated with both approaches.
+Segmentation strategies aim to group pixels with similar features (e.g. intensity, color, texture) or to separate dissimilar ones. Two main approaches are:
+\begin{itemize}
+    \item \textbf{Image partitioning}: Partition image based on thresholding, region growing and region splitting and merging.
+    \item \textbf{Intensity based changes}: Uses basic properties of intensity values: discontinuities and similarities.
+\end{itemize}
+In the following subsections, we discuss different techniques associated with both approaches.
 
 \subsubsection{Point Detection}
 
 Discontinuities in intensity can manifest as isolated points, lines, or edges. Detecting these primitive features is often the first step in segmentation tasks.
 
 A point in an image can be identified if its intensity differs significantly from those of its surroundings. One simple approach is to use the \emph{Laplacian filter} at each pixel:
-% \begin{equation}
-%     \nabla^2 f(x, y) = f(x+1, y) + f(x-1, y) + f(x, y+1) + f(x, y-1) - 4f(x, y),
-% \end{equation}
-% where \(f(x, y)\) is the intensity at pixel \((x, y)\). If \(\nabla^2 f\) at a location exceeds a threshold, that location may be classified as a point of interest (e.g., a corner or a small isolated feature).
+\begin{equation}
+    \nabla^2 f(x, y) = f(x+1, y) + f(x-1, y) + f(x, y+1) + f(x, y-1) - 4f(x, y),
+\end{equation}
+where \(f(x, y)\) is the intensity at pixel \((x, y)\). If \(\nabla^2 f\) at a location exceeds a threshold, that location may be classified as a point of interest (e.g. a corner).
+
+We can also express the Laplacian as a convolution with a kernel:
+\[
+M =
+\begin{bmatrix}
+0 & 1 & 0 \\
+1 & -4 & 1 \\
+0 & 1 & 0
+\end{bmatrix}.
+\]
+Convolution of the image with this kernel highlights regions with significant intensity changes, which can correspond to points of interest.
 
 \subsubsection{Line Detection}
 
-Line detection typically uses convolution masks designed to respond maximally to lines in certain orientations (e.g., 0°, 45°, 90°). For example, a line-detection mask for 0° orientation could be:
+Line detection typically uses convolution masks designed to respond maximally to lines in certain orientations (e.g. 0°, 45°, 90°). For example, a line-detection mask for 0° orientation could be:
 \[
 M_0 = 
 \begin{bmatrix}
@@ -291,69 +378,116 @@ which, when convolved with the image, provides a strong response along horizonta
 
 \subsubsection{Edge Detection}
 
-Edges generally correspond to significant shifts in intensity. A gradient-based approach uses first derivatives:
+Edges correspond to significant shifts in intensity. A gradient-based approach uses first derivatives:
 \[
 G_x(x,y) = \frac{\partial f}{\partial x}, \quad
 G_y(x,y) = \frac{\partial f}{\partial y},
 \]
-using operators like Sobel. The gradient magnitude and direction are:
-% \[
-% \lVert \mathbf{G}(x,y) \rVert 
-% = \sqrt{(G_x(x,y))^2 + (G_y(x,y))^2},
-% \quad
-% \theta(x,y) 
-% = \tan^{-1}\!\bigl(\tfrac{G_y(x,y)}{G_x(x,y)}\bigr).
-% \]
+using operators like Sobel. The gradient magnitude and direction are computed as:
+\[
+\lVert \mathbf{G}(x,y) \rVert 
+= \sqrt{(G_x(x,y))^2 + (G_y(x,y))^2},
+\quad
+\theta(x,y) 
+= \tan^{-1}\!\bigl(\tfrac{G_y(x,y)}{G_x(x,y)}\bigr).
+\]
 Pixels with a gradient magnitude above a threshold \(T\) are flagged as potential edges.
 
-% \paragraph{Advanced Edge Detection --- Laplacian of Gaussian}
+\paragraph{Advanced Edge Detection - Laplacian of Gaussian}
 
-% Another approach is to use the \emph{Laplacian of Gaussian (LoG)} operator, which smooths the image using a Gaussian filter to reduce noise, followed by the Laplacian. The LoG kernel can be expressed as:
-% \begin{equation}
-%     \text{LoG}(x, y) = \frac{\partial^2}{\partial x^2}\Bigl(G_\sigma(x, y)\Bigr) + \frac{\partial^2}{\partial y^2}\Bigl(G_\sigma(x, y)\Bigr),
-% \end{equation}
-% where \(G_\sigma(x, y)\) is a two-dimensional Gaussian with standard deviation \(\sigma\). The zero-crossings of the filtered result are used to locate edges.
+Simple gradient-based methods are sensitive to noise. Another approach is to use the \emph{Laplacian of Gaussian (LoG)} operator, which smooths the image using a Gaussian filter to reduce noise, followed by the Laplacian. The LoG kernel can be expressed as:
+\begin{equation}
+    \text{LoG}(x, y) = \frac{\partial^2}{\partial x^2}\Bigl(G_\sigma(x, y)\Bigr) + \frac{\partial^2}{\partial y^2}\Bigl(G_\sigma(x, y)\Bigr),
+\end{equation}
+where \(G_\sigma(x, y)\) is a two-dimensional Gaussian with standard deviation \(\sigma\). The zero-crossings of the filtered result are used to locate edges.
 
 \subsubsection{Edge Linking}
 
-% After detecting possible edge points, it is essential to form continuous edges by linking adjacent or nearby points. Edge linking methods can be divided into local and global approaches.
+After detecting possible edge points, it is essential to form continuous edges by linking adjacent or nearby points. Edge linking methods can be divided into local and global approaches.
 
 \paragraph{Local Processing}
 
-% In local processing, edge points are linked if they satisfy criteria such as \emph{distance} and \emph{direction} consistency. One simple method is:
-% \begin{enumerate}
-%     \item Compute the gradient direction at each edge point.
-%     \item For a given edge point, look at its neighbors in the corresponding direction.
-%     \item If a neighbor is also an edge point and their directions match, they are considered part of the same edge segment.
-% \end{enumerate}
+In local processing, edge points are linked if they satisfy criteria such as \emph{distance} and \emph{direction} consistency. One simple method is:
+\begin{enumerate}
+    \item Compute the gradient direction at each edge point.
+    \item For a given edge point, look at its neighbors in the corresponding direction.
+    \item If a neighbor is also an edge point and their directions match under a threshold, they are considered part of the same edge segment.
+\end{enumerate}
 
-\paragraph{Global Processing --- Hough Transform}
+\paragraph{Global Processing - Hough Transform}
 
-% A more global approach is the \emph{Hough transform}, which maps edge points from the spatial domain \((x, y)\) to a parameter space. For line detection, the line equation is parameterized by \(\rho\) and \(\theta\):
-% \begin{equation}
-%     \rho = x \cos\theta + y \sin\theta.
-% \end{equation}
-% Each edge point \((x, y)\) in the image contributes a curve in the parameter space. Intersections of these curves in \((\rho, \theta)\)-space indicate the presence of a line. This approach is robust to noise and can handle discontinuities in lines more effectively than local methods.
+A more global approach is the \emph{Hough transform}, which maps edge points from the spatial domain \((x, y)\) to a parameter space. For line detection, the line equation is parameterized by \(\rho\) and \(\theta\):
+\begin{equation}
+    \rho = x \cos\theta + y \sin\theta.
+\end{equation}
+Each edge point \((x, y)\) in the image contributes a curve in the parameter space. Intersections of these curves in \((\rho, \theta)\)-space indicate the presence of a line. This approach is robust to noise and can handle discontinuities in lines more effectively than local methods.
 
 \subsubsection{Region Growing}
 
-% Unlike discontinuity-based segmentation, region growing groups pixels into regions based on \emph{similarity criteria}. Starting from a set of \emph{seed points}, additional pixels are added if they are sufficiently similar in intensity or color to the region. A simple rule is:
-% \begin{equation}
-%     |f(x, y) - \mu_r| < T_r,
-% \end{equation}
-% where \(\mu_r\) is the average intensity of region \(r\), and \(T_r\) is a threshold. The process continues iteratively until no further pixels satisfy the similarity condition. Region growing is advantageous because it naturally incorporates spatial connectivity and can incorporate more complex similarity measures, such as texture or edge-based cues.
-
-\subsubsection{Multivariable Thresholding}
-
-% Thresholding is often extended to more than one channel or feature dimension. For instance, in color images using RGB channels, a pixel \((R, G, B)\) is included in a segment if:
-% \begin{equation}
-%     |R - \mu_R| < T_R, \quad |G - \mu_G| < T_G, \quad |B - \mu_B| < T_B,
-% \end{equation}
-% where \((\mu_R, \mu_G, \mu_B)\) and \((T_R, T_G, T_B)\) denote the mean intensity and thresholds in each channel, respectively. More sophisticated approaches can use joint probability distributions or feature vectors (e.g., intensity plus texture measures), determining whether a pixel belongs to a region by evaluating multi-dimensional distance metrics.
+\emph{Region growing} groups pixels into regions based on \emph{similarity criteria}. Starting from a set of \emph{seed points}, additional pixels are added if they are sufficiently similar in intensity or color to the region. A simple rule is:
+\begin{equation}
+    |f(x, y) - \mu_r| < T_r,
+\end{equation}
+where \(\mu_r\) is the average intensity of region \(r\), and \(T_r\) is a threshold. The process continues iteratively until no further pixels satisfy the similarity condition. Region growing is advantageous because it naturally incorporates spatial connectivity and can incorporate more complex similarity measures, such as texture or edge-based cues.
 
 \subsection{Connected Components Labeling}
 
-% TODO
+% Connected component labelling (CCL) is a fundamental operation in digital image analysis used to identify groups of connected pixels (often referred to as \emph{blobs}) in a binary image. In a typical scenario, one labels foreground pixels with unique identifiers, so that all pixels in one connected region share the same label. The notion of \emph{connectedness} is defined with respect to a neighborhood system (e.g., 4-connectivity or 8-connectivity in 2D images). For instance, under 4-connectivity, two pixels are connected if they share an edge, whereas 8-connectivity allows diagonal adjacency as well.
+
+% Formally, let \(g(x, y)\) be a binary image in which \(g(x, y) = 1\) denotes a foreground pixel and \(g(x, y) = 0\) denotes a background pixel. The goal of CCL is to produce a label image \(L(x, y)\), where \(L(x, y)\) is an integer label identifying the connected component to which \((x, y)\) belongs.
+
+\subsubsection{CCL Using Iterative Max-Filter}
+
+% One approach to CCL employs an \emph{iterative max-filter} technique on the label image. Typically, the process starts by assigning an initial label to each foreground pixel (for example, each foreground pixel is given its own label or labeled according to its position). Then, during each iteration, a local filter is applied to propagate labels among connected neighbors.
+
+% \begin{enumerate}
+%     \item \textbf{Initialization:}
+%     \[
+%     L_0(x, y) = 
+%     \begin{cases}
+%     \text{unique ID (e.g., } x \times \text{width} + y), & \text{if } g(x, y) = 1, \\
+%     0, & \text{otherwise}.
+%     \end{cases}
+%     \]
+%     \item \textbf{Max-Filter Update:} For iteration \(k\), the updated label at \((x, y)\) is 
+%     \[
+%     L_{k+1}(x, y) = 
+%     \max_{\substack{(u, v) \in N_4(x, y)}} L_k(u, v),
+%     \]
+%     where \(N_4(x, y)\) denotes the 4-connected neighborhood of \((x, y)\). (Alternatively, one can use the 8-connected neighborhood.)
+%     \item \textbf{Convergence:} The iteration continues until 
+%     \[
+%     L_{k+1}(x, y) = L_k(x, y) \quad \forall x, y,
+%     \]
+%     meaning that no further changes in the labels occur.
+% \end{enumerate}
+
+% Since connected regions merge their labels over multiple iterations, each region eventually converges to a single label (often the maximum of all initial labels in that region). A final pass can then \emph{relabel} each distinct maximal label to a smaller, more compact set of labels (e.g., \(\{1, 2, 3, \dots\}\)).
+
+\subsubsection{CCL by Filling}
+
+% Another common approach to connected component labelling is \emph{filling} (also known as \emph{flood fill}). In this method, one scans the binary image for unlabeled foreground pixels and labels the entire connected component containing that pixel by traversing the image in a systematic manner:
+
+% \begin{enumerate}
+%     \item \textbf{Initialization:} Set a label counter \(\ell = 1\). Initialize the label image \(L(x, y)\) to \(0\) for all \((x, y)\).
+%     \item \textbf{Scan for Foreground:} Perform a raster scan of the image. When an unlabeled foreground pixel \((x_0, y_0)\) (i.e., \(g(x_0, y_0) = 1\) and \(L(x_0, y_0) = 0\)) is found, \emph{flood-fill} the connected component containing \((x_0, y_0)\) with label \(\ell\). This is often done via a recursive or queue-based (breadth-first search, BFS) or stack-based (depth-first search, DFS) algorithm.
+%     \item \textbf{Increment Label Counter:} After the fill completes, all pixels in that connected component have label \(\ell\). Increase \(\ell \leftarrow \ell + 1\).
+%     \item \textbf{Continue Scan:} Resume scanning until all foreground pixels have been labelled.
+% \end{enumerate}
+
+% For the filling step, a BFS-based approach can be summarized as follows:
+
+% \begin{itemize}
+%     \item Initialize a queue \(\mathcal{Q}\) with the starting pixel \((x_0, y_0)\).
+%     \item While \(\mathcal{Q}\) is not empty:
+%     \begin{enumerate}
+%         \item Dequeue a pixel \((x, y)\).
+%         \item Label it: \(L(x, y) = \ell\).
+%         \item For each neighbor \((u, v)\in N_4(x, y)\), if \(g(u, v) = 1\) and \(L(u, v) = 0\), enqueue \((u, v)\) into \(\mathcal{Q}\).
+%     \end{enumerate}
+% \end{itemize}
+
+% In the end, each connected group of foreground pixels is assigned a unique label. This approach is straightforward and often easier to implement, although it requires careful handling of recursion depth or queue size, especially for large images.
 
 \section{Application: FISH Signal Counts}
 
