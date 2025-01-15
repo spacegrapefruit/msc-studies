@@ -277,6 +277,8 @@ def filled_bottles_pipeline(input_path: str, output_dir: str) -> list[dict]:
     Detects filled bottles in an image.
     """
     image = load_tiff_image(input_path)
+    save_image(image, output_dir / "image_raw.png")
+
     final_image = np.zeros_like(image, dtype=np.uint8)
 
     histogram_plot = make_histogram(image, log_scale=True)

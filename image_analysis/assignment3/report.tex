@@ -698,7 +698,7 @@ $ python python/main.py circuit-board-qa \
     <input_path>
 \end{lstlisting}
 
-Here, the \texttt{input\_path} is the file paths to the x-ray image of the circuit board. In this analysis, we processed the provided sample image:
+Here, the \texttt{input\_path} is the file path to the x-ray image of the circuit board. In this analysis, we processed the provided sample image:
 
 \begin{lstlisting}[language=bash]
 $ python python/main.py circuit-board-qa \
@@ -801,22 +801,63 @@ The complete list of defects detected in the circuit board image is printed in t
 
 % These assumptions, while simplifying the implementation, may limit the robustness of the solution in highly variable production environments. Additional calibration steps or machine learning-based feature extraction methods can be integrated to address these challenges.
 
+\subsection{Running the Analysis}
+
+Terminal command to run the analysis:
+
+\begin{lstlisting}[language=bash]
+$ python python/main.py filled-bottles \
+    <input_path>
+\end{lstlisting}
+
+Here, the \texttt{input\_path} is the file path to the image of the filled bottles. In this analysis, we processed the provided sample image:
+
+\begin{lstlisting}[language=bash]
+$ python python/main.py filled-bottles \
+    data/input/Bottles.tif
+\end{lstlisting}
+
 \subsection{Results}
 
-% The algorithm was tested on a dataset of sample images provided by the company. The performance metrics include accuracy, processing speed, and robustness under varying conditions:
-% \begin{itemize}
-%     \item \textbf{Accuracy:} The algorithm achieved a detection accuracy of 95\% in identifying improperly filled bottles.
-%     \item \textbf{Processing Speed:} Each image was processed within 0.5 seconds, ensuring compatibility with the required production rate of a few images per minute.
-%     \item \textbf{Robustness:} The solution demonstrated resilience to moderate variations in lighting and minor deviations in camera positioning.
-% \end{itemize}
+\subsubsection{Visualizations of Intermediate Steps}
 
-% Sample images showcasing correctly and incorrectly filled bottles are illustrated in Figure \ref{fig:results}. The results validate the algorithm's effectiveness but also highlight areas for potential improvement, such as handling edge cases where reflections or labels obscure the liquid level.
+The intermediate steps of the analysis are visualized in the output images. Figure~\ref{fig:bottle_raw} shows the raw image of the filled bottles. The image contains five bottles with varying liquid levels. Two bottles sit on the border of the image, and were not analyzed. Out of the remaining three bottles, the middle bottle is underfilled.
 
-% \begin{figure}[h!]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{sample_bottle_image.png}
-%     \caption{Sample images of correctly and incorrectly filled bottles.}
-%     \label{fig:results}
-% \end{figure}
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/filled_bottles/image_raw.png}
+    \caption{Raw Image of Filled Bottles.}
+    \label{fig:bottle_raw}
+\end{figure}
+
+The processed image with detected liquid levels is shown in Figure~\ref{fig:bottle_processed}. The background is black, the liquid level is marked in grey, and the air region is white. The neck and shoulder regions are displayed as black horizontal lines. It is evident that the middle bottle is underfilled, as the liquid level is below the midpoint between the neck and shoulders.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{data/output/filled_bottles/final_image.png}
+    \caption{Processed Image with Detected Liquid Levels.}
+    \label{fig:bottle_processed}
+\end{figure}
+
+\subsubsection{Liquid Level in Provided Sample Image}
+
+The image analysis script prints the results of the liquid level detection for each bottle in the sample image. Table~\ref{tab:bottle_results} shows the results for the provided sample image.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Liquid Level Detection Results for Sample Bottles}
+    \label{tab:bottle_results}
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+        \textbf{Bottle ID} & \textbf{Centroid (X, Y)} & \textbf{Liquid Level} & \textbf{Neck-Shoulder Range} & \textbf{Filled} \\
+        \hline
+        1 & (254.23, 190.84) & 132 & 67-92 & False \\
+        2 & (134.80, 190.69) & 73 & 68-94 & True \\
+        3 & (372.80, 190.69) & 73 & 68-94 & True \\
+        \hline
+    \end{tabular}
+\end{table}
+
+The method was tested on a synthetic dataset of hand-crafted images, simulating various liquid levels in bottles. The results were omitted for brevity but demonstrated the algorithm's robustness in detecting improperly filled bottles at different liquid levels and lighting conditions.
 
 \end{document}
