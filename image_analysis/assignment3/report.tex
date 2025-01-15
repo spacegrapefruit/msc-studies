@@ -331,8 +331,6 @@ Here, \((B_1, B_2)\) is placed at a candidate point, and if \(B_1\) fits inside 
 
 Hit-or-miss transforms are useful for detecting specific patterns or structures in binary images, such as corners, T-junctions, or other geometric arrangements. Note that hit-or-miss transforms do pixel-perfect matching.
 
-\newpage
-
 \subsection{Image Segmentation}
 
 Image segmentation is the process of partitioning a digital image into multiple segments (sets of pixels) to simplify its representation and make it more meaningful for analysis. It enables further operations such as object recognition, tracking, and scene understanding. This section provides an overview of segmentation techniques, focusing on point, line, and edge detection, edge linking, region growing, and thresholding.
@@ -489,58 +487,50 @@ For the filling step, a BFS-based approach can be summarized as follows:
 
 In the end, each connected group of foreground pixels is assigned a unique label. This approach is implemented in the provided solution for connected component labelling.
 
+\newpage
+
 \section{Application: FISH Signal Counts}
 
-% In the realm of biological sciences, image analysis facilitates the quantification and visualization of cellular structures and molecular signals, which are essential for understanding complex biological processes. Techniques such as thresholding, morphological operations, and connected components labeling are fundamental in processing fluorescence microscopy images to detect and analyze cells and their associated signals. This report delves into a pipeline designed to detect cells in fluorescence images, apply necessary image processing techniques, and calculate signal counts and ratios, providing a comprehensive overview for beginners in digital image analysis.
+In the realm of medical studies, pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations.
 
-Pathologists rely on identifying specific mutations within tumor tissues to determine appropriate cancer treatments. A widely used method to visualize these mutations is Fluorescence In-Situ Hybridization (FISH), which combines molecular biology and imaging techniques. In this method, fluorescent probes are attached to specific RNA sequences in the tumor biopsy, enabling the detection of genetic mutations.
+These fluorescent labels are visualized using fluorescence microscopy, where each label emits light at specific wavelengths corresponding to the attached probe:
+\begin{itemize}
+    \item \textbf{DAPI} stains the cell interiors to define cell boundaries.
+    \item \textbf{Acridine} marks one genetic mutation.
+    \item \textbf{FITC} marks another genetic mutation.
+\end{itemize}
 
-These fluorescent labels are visualized using fluorescence microscopy, where each label emits light at specific wavelengths corresponding to the attached probe.
-% \begin{itemize}
-%     \item \textbf{Acridine} (visualized as red) marks one genetic mutation.
-%     \item \textbf{FITC} (visualized as green) marks another genetic mutation.
-%     \item \textbf{DAPI} (visualized as blue) stains cell nuclei to define cell boundaries.
-% \end{itemize}
-
-The combined imaging technique allows the simultaneous detection of genetic mutations and the spatial identification of cells. This method is essential for quantifying the occurrence and co-localization of mutations in individual cells.
+The objective of this application is to analyze FISH images to count the number of Acridine and FITC signals within each complete cell. This information is crucial for determining the genetic status of the cells and identifying potential mutations.
 
 \subsection{Methodology}
 
 The process for detecting cells and calculating signal counts and ratios involves a series of steps:
 
-\subsubsection{Input Acquisition}
+\paragraph{Input Acquisition}
 
-The pipeline accepts three input images corresponding to different fluorescence channels:
+The methodology begins with acquiring three fluorescence microscopy images corresponding to the DAPI, Acridine, and FITC channels. These images are loaded in TIFF format using the \texttt{load\_tiff\_image} function. In order to co-localize the signals, the images are combined into a single RGB image for visualization purposes: DAPI (red), Acridine (green), and FITC (blue).
+
+\paragraph{Thresholding}
+
+Each input image undergoes thresholding to create binary masks:
 \begin{itemize}
-    \item \textbf{DAPI Channel}: Stains the cell nuclei, providing a reference for cell localization.
-    \item \textbf{Acridine Channel}: Highlights specific cellular components stained with Acridine.
-    \item \textbf{FITC Channel}: Represents signals from FITC-labeled molecules.
+    \item \textbf{DAPI Mask}: Generated by applying a global threshold value of 24 to the DAPI image.
+    \item \textbf{Acridine Mask}: Generated by applying a global threshold of 128 to the Acridine image.
+    \item \textbf{FITC Mask}: Generated by applying a global threshold of 80 to the FITC image.
 \end{itemize}
-These images are loaded in TIFF format using the \texttt{load\_tiff\_image} function. The images are then combined into a single RGB image for visualization purposes: DAPI (red), Acridine (green), and FITC (blue).
+The \texttt{apply\_threshold} function implements the thresholding operation, converting channels into binary masks based on the specified thresholds.
 
-\subsubsection{Thresholding}
+The thresholds were determined empirically to best separate the signals from the background in the provided sample images.
 
-% Each input image undergoes thresholding to create binary masks:
-% \begin{itemize}
-%     \item \textbf{DAPI Mask}: Generated by applying a threshold value \texttt{threshold\_dapi} to the DAPI image.
-%     \item \textbf{Acridine Mask}: Generated by applying \texttt{threshold\_acridine} to the Acridine image.
-%     \item \textbf{FITC Mask}: Generated by applying \texttt{threshold\_fitc} to the FITC image.
-% \end{itemize}
-% The \texttt{apply\_threshold} function implements the thresholding operation, converting grayscale images into binary masks based on the specified thresholds.
+\paragraph{Morphological Operations}
 
-\subsubsection{Saving Binary Masks}
+In order to refine the detection of cells:
+\begin{itemize}
+    \item \textbf{Hole Filling}: The \texttt{fill\_object\_holes} function fills any holes within the DAPI mask, ensuring complete cell representation.
+    \item \textbf{Morphological Opening}: The DAPI mask undergoes morphological opening using a square kernel of size \(5 \times 5\). This operation, implemented by \texttt{morphological\_open}, helps in smoothing the cell boundaries and removing small artifacts.
+\end{itemize}
 
-% The binary masks for DAPI, Acridine, and FITC channels are stacked along the last axis and saved as a composite image using the \texttt{save\_image} function. This provides a visual representation of the thresholded channels.
-
-\subsubsection{Morphological Operations}
-
-% To refine the detection of cells:
-% \begin{itemize}
-%     \item \textbf{Hole Filling}: The \texttt{fill\_object\_holes} function fills any holes within the DAPI mask, ensuring complete cell nuclei representation.
-%     \item \textbf{Erosion and Dilation}: The DAPI mask undergoes erosion followed by dilation using a kernel size of 5 pixels. These operations, implemented by \texttt{morphological\_erode} and \texttt{morphological\_dilate}, respectively, help in removing small artifacts and smoothing the boundaries of detected cells.
-% \end{itemize}
-
-\subsubsection{Connected Components Labeling}
+\paragraph{Connected Components Labeling}
 
 Post morphological processing, connected components labeling is applied:
 \begin{itemize}
@@ -548,69 +538,43 @@ Post morphological processing, connected components labeling is applied:
     \item \textbf{Labeling Signals}: Similarly, Acridine and FITC masks are labeled.
 \end{itemize}
 
-\subsubsection{Border Touching and Cell Filtering}
+\paragraph{Border Touching and Cell Filtering}
 
-% Each labeled cell is examined to determine if it touches the image borders using the \texttt{check\_border\_touching} function:
-% \begin{itemize}
-%     \item Cells touching the border are considered incomplete and are marked with half-intensity in the DAPI image.
-%     \item Cells not touching the border are fully marked.
-%     \item Additionally, cells with an area smaller than a predefined minimum (\texttt{MIN\_CELL\_AREA}) are identified and logged as potential artifacts.
-% \end{itemize}
+Each labeled cell is examined to determine if it touches the image borders using the \texttt{check\_border\_touching} function:
+\begin{itemize}
+    \item Cells touching the border are considered incomplete.
+    \item Additionally, ells with an area smaller than a predefined minimum (\texttt{MIN\_CELL\_AREA} = 100 pixels) are identified and logged as potential artifacts. However, there are no such cells in the provided sample images.
+\end{itemize}
 
-\subsubsection{Signal Counting}
+\paragraph{Signal Counting}
 
-The number of Acridine and FITC signals within each cell is counted using the \texttt{calculate\_signal\_counts} function. This function iterates over each labeled cell and computes the number of signals present in the corresponding Acridine and FITC masks.
+The number of Acridine and FITC signals within each cell is counted using the \texttt{calculate\_signal\_counts} function. This function iterates over each labeled cell and computes the number of unique components present in the corresponding Acridine and FITC masks. Additioanlly, for each cell, the centroid coordinates and area are calculated. The results are printed to the console.
 
-% \subsubsection{Final Binary Masks and Signal Calculation}
+FITC or Acridine signals that are not contained within a labeled cell are logged as potential artifacts. They are not considered in the signal count calculations.
 
-% % The refined binary masks are saved as \texttt{binary\_masks\_cleaned.png}. Finally, the \texttt{calculate\_signal\_counts} function computes the signal counts and ratios for each labeled cell, producing a list of dictionaries containing the results.
-
-
-
-
-% The analysis involves the following steps:
-% \begin{enumerate}
-%     \item \textbf{Image Acquisition:} Fluorescence microscopy captures three images corresponding to different wavelengths:
-%     \begin{itemize}
-%         \item \textit{BXY-ABCD Region 002 FOV 00040 Acridine.tif} (red channel).
-%         \item \textit{BXY-ABCD Region 002 FOV 00040 FITC.tif} (green channel).
-%         \item \textit{BXY-ABCD Region 002 FOV 00040 DAPI.tif} (blue channel).
-%     \end{itemize}
-%     \item \textbf{Image Preprocessing:} The three images are combined into a single RGB image:
-%     \begin{itemize}
-%         \item Acridine signals are represented as red.
-%         \item FITC signals are represented as green.
-%         \item DAPI-stained nuclei are represented as blue.
-%     \end{itemize}
-%     \item \textbf{Cell Segmentation:} Using the DAPI channel, individual cell nuclei are segmented to identify complete cells.
-%     \item \textbf{Signal Quantification:} For each segmented cell:
-%     \begin{itemize}
-%         \item Count the number of Acridine (red) signals.
-%         \item Count the number of FITC (green) signals.
-%     \end{itemize}
-%     \item \textbf{Signal Ratio Calculation:} Compute the ratio of Acridine to FITC signals for each cell.
-%     \item \textbf{Result Compilation:} A comprehensive list is generated for all cells, including:
-%     \begin{itemize}
-%         \item Number of Acridine signals.
-%         \item Number of FITC signals.
-%         \item Ratio of Acridine to FITC signals.
-%     \end{itemize}
-% \end{enumerate}
-
-\subsection{Results}
+\subsection{Running the Analysis}
 
 Terminal command to run the analysis:
 
 \begin{lstlisting}[language=bash]
 $ $python python/main.py fish-signal-counts \
-    input_path_acridine \
-    input_path_fitc \
-    input_path_dapi
+    <input_path_acridine> \
+    <input_path_fitc> \
+    <input_path_dapi>
 \end{lstlisting}
 
-Here, the \texttt{input\_path\_acridine}, \texttt{input\_path\_fitc}, and \texttt{input\_path\_dapi} are the file paths to the Acridine, FITC, and DAPI images, respectively. In this analysis, we processed the provided sample images \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_Acridine.tif}, \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_FITC.tif}, and \textit{data/input/BXY-ABCD\_Region 002\_FOV 00040\_DAPI.tif}.
+Here, the \texttt{input\_path\_acridine}, \texttt{input\_path\_fitc}, and \texttt{input\_path\_dapi} are the file paths to the Acridine, FITC, and DAPI images, respectively. In this analysis, we processed the provided sample images:
 
-\subsection{Binary Mask Visualization}
+\begin{lstlisting}[language=bash]
+$ python python/main.py fish-signal-counts \
+    data/input/BXY-ABCD_Region 002_FOV_00040_Acridine.tif \
+    data/input/BXY-ABCD_Region 002_FOV_00040_FITC.tif \
+    data/input/BXY-ABCD_Region 002_FOV_00040_DAPI.tif
+\end{lstlisting}
+
+\subsection{Results}
+
+\subsubsection{Binary Mask Visualization}
 
 Figure~\ref{fig:cell_binary_masks} presents the initial binary masks generated from the DAPI, Acridine, and FITC channels. The masks effectively isolate the nuclei and signal regions, providing a clear basis for subsequent analysis.
 
@@ -630,7 +594,7 @@ Figure~\ref{fig:cell_binary_masks_cleaned} shows the cleaned binary masks after 
     \label{fig:cell_binary_masks_cleaned}
 \end{figure}
 
-\subsection{Signal Counts and Ratios}
+\subsubsection{Signal Counts and Ratios}
 
 The pipeline successfully identified and labeled individual cells, enabling the calculation of Acridine and FITC signal counts within each cell. The program identifies 30 complete cells in the provided sample images and computes the signal counts and ratios for each cell.
 
