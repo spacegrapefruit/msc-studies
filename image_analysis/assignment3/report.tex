@@ -63,7 +63,7 @@ Full colour image processing involves manipulating or analyzing images in their 
 \begin{itemize}
     \item \textbf{Colour Enhancement}: Adjusting brightness, contrast, or gamma in one or more channels to improve visual quality.
     \item \textbf{Colour Balancing}: Correcting or normalizing images, for example by imposing white balance to ensure a neutral background.
-    \item \textbf{Segmentation and Object Recognition}: Using features in the colour space to isolate objects (e.g., detecting green plants against a darker background in an agricultural scene).
+    \item \textbf{Segmentation and Object Recognition}: Using features in the colour space to isolate objects (e.g. detecting green plants against a darker background in an agricultural scene).
 \end{itemize}
 
 The general colour transformation in full colour image processing can be expressed as:
@@ -105,7 +105,7 @@ Noise in colour images can arise from various sources such as sensor electronics
     \item \textbf{Salt-and-Pepper Noise}: Prevalent in digital transmission errors or faulty pixels, leading to random instances of maximum or minimum intensity in each channel.
 \end{itemize}
 
-Denoising methods for colour images often extend grayscale techniques (e.g., median or Gaussian filters) to each channel separately or adopt vector-based approaches to better preserve chromatic relationships.
+Denoising methods for colour images often extend grayscale techniques (e.g. median or Gaussian filters) to each channel separately or adopt vector-based approaches to better preserve chromatic relationships.
 
 \subsection{Thresholding}
 
@@ -430,64 +430,64 @@ Each edge point \((x, y)\) in the image contributes a curve in the parameter spa
 \end{equation}
 where \(\mu_r\) is the average intensity of region \(r\), and \(T_r\) is a threshold. The process continues iteratively until no further pixels satisfy the similarity condition. Region growing is advantageous because it naturally incorporates spatial connectivity and can incorporate more complex similarity measures, such as texture or edge-based cues.
 
-\subsection{Connected Components Labeling}
+\subsection{Connected Components Labeling (CCL)}
 
-% Connected component labelling (CCL) is a fundamental operation in digital image analysis used to identify groups of connected pixels (often referred to as \emph{blobs}) in a binary image. In a typical scenario, one labels foreground pixels with unique identifiers, so that all pixels in one connected region share the same label. The notion of \emph{connectedness} is defined with respect to a neighborhood system (e.g., 4-connectivity or 8-connectivity in 2D images). For instance, under 4-connectivity, two pixels are connected if they share an edge, whereas 8-connectivity allows diagonal adjacency as well.
+In digital image analysis, connected component labelling (CCL) used to identify groups of connected pixels (often referred to as \emph{blobs}) in a binary image. In a typical scenario, one labels foreground pixels with unique identifiers, so that all pixels in one connected region share the same label. The notion of \emph{connectedness} is defined with respect to a neighborhood system (usually 4-connectivity or 8-connectivity).
 
-% Formally, let \(g(x, y)\) be a binary image in which \(g(x, y) = 1\) denotes a foreground pixel and \(g(x, y) = 0\) denotes a background pixel. The goal of CCL is to produce a label image \(L(x, y)\), where \(L(x, y)\) is an integer label identifying the connected component to which \((x, y)\) belongs.
+Formally, let \(g(x, y)\) be a binary image in which \(g(x, y) = 1\) denotes a foreground pixel and \(g(x, y) = 0\) denotes a background pixel. The goal of CCL is to produce a label image \(L(x, y)\), where \(L(x, y)\) is an integer label identifying the connected component to which \((x, y)\) belongs.
 
 \subsubsection{CCL Using Iterative Max-Filter}
 
-% One approach to CCL employs an \emph{iterative max-filter} technique on the label image. Typically, the process starts by assigning an initial label to each foreground pixel (for example, each foreground pixel is given its own label or labeled according to its position). Then, during each iteration, a local filter is applied to propagate labels among connected neighbors.
+One approach to CCL employs an \emph{iterative max-filter} technique on the label image. Typically, the process starts by assigning an initial label to each foreground pixel (for example, each foreground pixel is given its own label or labeled according to its position). Then, during each iteration, a local filter is applied to propagate labels among connected neighbors.
 
-% \begin{enumerate}
-%     \item \textbf{Initialization:}
-%     \[
-%     L_0(x, y) = 
-%     \begin{cases}
-%     \text{unique ID (e.g., } x \times \text{width} + y), & \text{if } g(x, y) = 1, \\
-%     0, & \text{otherwise}.
-%     \end{cases}
-%     \]
-%     \item \textbf{Max-Filter Update:} For iteration \(k\), the updated label at \((x, y)\) is 
-%     \[
-%     L_{k+1}(x, y) = 
-%     \max_{\substack{(u, v) \in N_4(x, y)}} L_k(u, v),
-%     \]
-%     where \(N_4(x, y)\) denotes the 4-connected neighborhood of \((x, y)\). (Alternatively, one can use the 8-connected neighborhood.)
-%     \item \textbf{Convergence:} The iteration continues until 
-%     \[
-%     L_{k+1}(x, y) = L_k(x, y) \quad \forall x, y,
-%     \]
-%     meaning that no further changes in the labels occur.
-% \end{enumerate}
+\begin{enumerate}
+    \item \textbf{Initialization:}
+    \[
+    L_0(x, y) = 
+    \begin{cases}
+    \text{unique ID (e.g. } x \times \text{width} + y), & \text{if } g(x, y) = 1, \\
+    0, & \text{otherwise}.
+    \end{cases}
+    \]
+    \item \textbf{Max-Filter Update:} For iteration \(k\), the updated label at \((x, y)\) is 
+    \[
+    L_{k+1}(x, y) = 
+    \max_{\substack{(u, v) \in N_4(x, y)}} L_k(u, v),
+    \]
+    where \(N_4(x, y)\) denotes the 4-connected neighborhood of \((x, y)\). (Alternatively, one can use the 8-connected neighborhood.)
+    \item \textbf{Convergence:} The iteration continues until 
+    \[
+    L_{k+1}(x, y) = L_k(x, y) \quad \forall x, y,
+    \]
+    meaning that no further changes in the labels occur.
+\end{enumerate}
 
-% Since connected regions merge their labels over multiple iterations, each region eventually converges to a single label (often the maximum of all initial labels in that region). A final pass can then \emph{relabel} each distinct maximal label to a smaller, more compact set of labels (e.g., \(\{1, 2, 3, \dots\}\)).
+Since connected regions merge their labels over multiple iterations, each region eventually converges to a single (in this case, the maximum) label. A final pass can then \emph{relabel} each distinct (maximal) label to a smaller, more compact set of labels (e.g. \(\{1, 2, 3, \dots\}\)).
 
 \subsubsection{CCL by Filling}
 
-% Another common approach to connected component labelling is \emph{filling} (also known as \emph{flood fill}). In this method, one scans the binary image for unlabeled foreground pixels and labels the entire connected component containing that pixel by traversing the image in a systematic manner:
+Another common approach to connected component labelling is \emph{filling} (also known as \emph{flood fill}). In this method, one scans the binary image for unlabeled foreground pixels and labels the entire connected component containing that pixel by traversing the image in a systematic manner:
 
-% \begin{enumerate}
-%     \item \textbf{Initialization:} Set a label counter \(\ell = 1\). Initialize the label image \(L(x, y)\) to \(0\) for all \((x, y)\).
-%     \item \textbf{Scan for Foreground:} Perform a raster scan of the image. When an unlabeled foreground pixel \((x_0, y_0)\) (i.e., \(g(x_0, y_0) = 1\) and \(L(x_0, y_0) = 0\)) is found, \emph{flood-fill} the connected component containing \((x_0, y_0)\) with label \(\ell\). This is often done via a recursive or queue-based (breadth-first search, BFS) or stack-based (depth-first search, DFS) algorithm.
-%     \item \textbf{Increment Label Counter:} After the fill completes, all pixels in that connected component have label \(\ell\). Increase \(\ell \leftarrow \ell + 1\).
-%     \item \textbf{Continue Scan:} Resume scanning until all foreground pixels have been labelled.
-% \end{enumerate}
+\begin{enumerate}
+    \item \textbf{Initialization:} Set a label counter \(\ell = 1\). Initialize the label image \(L(x, y)\) to \(0\) for all \((x, y)\).
+    \item \textbf{Scan for Foreground:} Perform a scan of the image. When an unlabeled foreground pixel \((x_0, y_0)\) (i.e., \(g(x_0, y_0) = 1\) and \(L(x_0, y_0) = 0\)) is found, \emph{flood-fill} the connected component containing \((x_0, y_0)\) with label \(\ell\). This is often done via a recursive or queue-based (breadth-first search, BFS) or stack-based (depth-first search, DFS) algorithm.
+    \item \textbf{Increment Label Counter:} After the fill completes, all pixels in that connected component have label \(\ell\). Increase \(\ell \leftarrow \ell + 1\).
+    \item \textbf{Continue Scan:} Resume scanning until all foreground pixels have been labelled.
+\end{enumerate}
 
-% For the filling step, a BFS-based approach can be summarized as follows:
+For the filling step, a BFS-based approach can be summarized as follows:
 
-% \begin{itemize}
-%     \item Initialize a queue \(\mathcal{Q}\) with the starting pixel \((x_0, y_0)\).
-%     \item While \(\mathcal{Q}\) is not empty:
-%     \begin{enumerate}
-%         \item Dequeue a pixel \((x, y)\).
-%         \item Label it: \(L(x, y) = \ell\).
-%         \item For each neighbor \((u, v)\in N_4(x, y)\), if \(g(u, v) = 1\) and \(L(u, v) = 0\), enqueue \((u, v)\) into \(\mathcal{Q}\).
-%     \end{enumerate}
-% \end{itemize}
+\begin{itemize}
+    \item Initialize a queue \(\mathcal{Q}\) with the starting pixel \((x_0, y_0)\).
+    \item While \(\mathcal{Q}\) is not empty:
+    \begin{enumerate}
+        \item Dequeue a pixel \((x, y)\).
+        \item Label it: \(L(x, y) = \ell\).
+        \item For each neighbor \((u, v)\in N_4(x, y)\), if \(g(u, v) = 1\) and \(L(u, v) = 0\), enqueue \((u, v)\) into \(\mathcal{Q}\).
+    \end{enumerate}
+\end{itemize}
 
-% In the end, each connected group of foreground pixels is assigned a unique label. This approach is straightforward and often easier to implement, although it requires careful handling of recursion depth or queue size, especially for large images.
+In the end, each connected group of foreground pixels is assigned a unique label. This approach is implemented in the provided solution for connected component labelling.
 
 \section{Application: FISH Signal Counts}
 
