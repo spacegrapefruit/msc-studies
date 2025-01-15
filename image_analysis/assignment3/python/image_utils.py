@@ -300,6 +300,7 @@ def make_mean_intensity_plot(
     ax[1].plot(means_above)
     ax[1].plot(means_below)
     ax[1].plot(means_above - means_below)
+    ax[1].axvline(liquid_level, color="blue")
     ax[1].set_xlabel("Row")
     ax[1].set_ylabel("Intensity mean/difference")
 

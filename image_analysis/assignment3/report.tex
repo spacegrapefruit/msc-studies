@@ -9,7 +9,7 @@
 
 \title{Assignment 3: Applications of Image Processing to Real-World Problems}
 \author{Aleksandr Jan Smoliakov}
-\date{2024--12--20}
+\date{2025--01--15}
 
 \begin{document}
 
@@ -826,12 +826,12 @@ By removing a thin outer layer, the bottle silhouettes become more stable for sh
 
 \paragraph{Row-Wise Intensity Analysis}
 
-Once the bottles of interest are isolated, we calculate row-wise intensities to detect the height of the liquid inside each bottle. Specifically, the function iterates over each row in the image (within the bottle region) and computes the mean intensity of that row. This procedure yields a one-dimensional profile of brightness versus vertical position. 
+Once the bottles of interest are isolated, we calculate row-wise intensities to detect the height of the liquid inside each bottle. Specifically, the function iterates over each row in the image (within the bottle region) and computes the mean intensity of that row. This procedure yields a one-dimensional profile of brightness versus vertical position.
 
-To further refine the analysis, we compute two auxiliary signals:
+Based on the provided image, we make the assumption that the liquid inside the bottle is darker than the empty region above it. To further refine the analysis, we compute two auxiliary signals:
 \begin{itemize}
-    \item \textbf{Means Above}: Running average of row means from the top of the bottle down to a given row.
-    \item \textbf{Means Below}: Running average of row means from a given row down to the bottom of the bottle.
+    \item \textbf{Means Above}: Running average of row intensity means from the top of the bottle down to a given row.
+    \item \textbf{Means Below}: Running average of row intensity means from a given row down to the bottom of the bottle.
 \end{itemize}
 By subtracting \textit{means below} from \textit{means above}, the algorithm highlights transitions from liquid-filled to empty (or vice versa). The row index that produces the maximum difference (i.e., \(\arg\max(\textit{means above} - \textit{means below})\)) is taken as the \emph{liquid level}.
 
