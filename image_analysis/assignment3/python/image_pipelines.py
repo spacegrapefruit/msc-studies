@@ -18,8 +18,8 @@ from image_utils import (
     make_expected_region_mask,
     make_histogram,
     make_mean_intensity_plot,
-    morphological_dilate,
     morphological_erode,
+    morphological_open,
     pad_and_clip_angles,
     save_image,
 )
@@ -61,6 +61,20 @@ def fish_signal_counts_pipeline(
     fitc_image = load_tiff_image(input_path_fitc)
     dapi_image = load_tiff_image(input_path_dapi)
 
+    # # save raw images
+    # for name, image, threshold in zip(
+    #     ["acridine", "fitc", "dapi"],
+    #     [acridine_image, fitc_image, dapi_image],
+    #     [threshold_acridine, threshold_fitc, threshold_dapi],
+    # ):
+    #     save_image(image, output_dir / f"{name}_image_raw.png")
+    #     histogram_plot = make_histogram(image, vline=threshold, log_scale=True)
+    #     save_image(histogram_plot, output_dir / f"{name}_histogram.png")
+    save_image(
+        np.stack([dapi_image, acridine_image, fitc_image], axis=-1),
+        output_dir / "raw_rgb_image.png",
+    )
+
     # apply thresholds
     dapi_mask = apply_threshold(dapi_image, threshold_dapi)
     acridine_mask = apply_threshold(acridine_image, threshold_acridine)
@@ -73,9 +87,12 @@ def fish_signal_counts_pipeline(
     # fill holes in DAPI cells
     dapi_mask = fill_object_holes(dapi_mask)
 
-    # morphological erosion + dilation of cells
-    dapi_mask = morphological_erode(dapi_mask, kernel_size=5)
-    dapi_mask = morphological_dilate(dapi_mask, kernel_size=5)
+    # morphological opening to remove noise
+    dapi_mask = morphological_open(dapi_mask, kernel_size=5)
+
+    # # morphological closing to connect fragmented signals
+    # acridine_mask = morphological_close(acridine_mask, kernel_size=3)
+    # fitc_mask = morphological_close(fitc_mask, kernel_size=3)
 
     # label all connected components
     labeled_cells, num_cells = label_connected_components(dapi_mask)
@@ -128,8 +145,8 @@ def circuit_board_qa_pipeline(input_path: str, output_dir: str) -> list[dict]:
     holes_mask = image == PCBColour.HOLES
     solder_mask = (image == PCBColour.SOLDER) | holes_mask
 
-    solder_mask_thick = morphological_erode(solder_mask, kernel_size=5)
-    solder_mask_thick = morphological_dilate(solder_mask_thick, kernel_size=5)
+    # morphological opening to remove thin traces
+    solder_mask_thick = morphological_open(solder_mask, kernel_size=5)
     solder_mask_thick = solder_mask_thick & solder_mask
     save_image(solder_mask_thick, output_dir / "solder_mask_thick.png")
 
@@ -265,9 +282,10 @@ def filled_bottles_pipeline(input_path: str, output_dir: str) -> list[dict]:
     save_image(histogram_plot, output_dir / "histogram.png")
 
     # normalise the image
-    image = (image / (image.max() - image.min()) * 255).astype(np.uint8)
+    image = ((image - image.min()) / (image.max() - image.min()) * 255).astype(np.uint8)
 
-    bottle_mask = apply_threshold(image, threshold=0.1)
+    # assuming monochromatic background really
+    bottle_mask = apply_threshold(image, threshold=5)
     labeled_bottles, num_bottles = label_connected_components(bottle_mask)
 
     results = []

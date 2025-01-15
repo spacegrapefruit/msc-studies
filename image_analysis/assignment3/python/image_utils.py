@@ -28,6 +28,21 @@ def apply_threshold(image: np.ndarray, threshold: int) -> np.ndarray:
     return image > threshold
 
 
+def apply_local_threshold(image: np.ndarray, window_size: int, c: int) -> np.ndarray:
+    """
+    Apply a local threshold to a grayscale image.
+    """
+    padded_image = np.pad(image, window_size // 2, mode="constant", constant_values=0)
+
+    sliding_windows = np.lib.stride_tricks.sliding_window_view(
+        padded_image, (window_size, window_size)
+    )
+
+    local_thresholds = np.mean(sliding_windows, axis=(-2, -1)) + c
+
+    return image > local_thresholds
+
+
 def save_image(image: Union[np.ndarray, plt.Figure], file_path: str):
     """
     Save an image to a file.
@@ -173,6 +188,24 @@ def morphological_erode(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray
     return eroded_mask
 
 
+def morphological_open(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Apply morphological opening to a binary mask.
+    """
+    return morphological_dilate(
+        morphological_erode(binary_mask, kernel_size), kernel_size
+    )
+
+
+def morphological_close(binary_mask: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Apply morphological closing to a binary mask.
+    """
+    return morphological_erode(
+        morphological_dilate(binary_mask, kernel_size), kernel_size
+    )
+
+
 def calculate_signal_counts(
     labeled_cells: np.ndarray,
     labeled_acridine: np.ndarray,
@@ -224,7 +257,11 @@ def calculate_signal_counts(
 
 
 def make_histogram(
-    image: np.ndarray, bins: int = 256, range: tuple = (0, 256), log_scale: bool = False
+    image: np.ndarray,
+    bins: int = 256,
+    range: tuple = (0, 256),
+    vline=None,
+    log_scale: bool = False,
 ) -> plt.Figure:
     """
     Make a histogram plot of a grayscale image.
@@ -238,6 +275,9 @@ def make_histogram(
     ax.set_title("Image Histogram")
     ax.set_xlabel("Pixel Intensity")
     ax.set_ylabel("Frequency")
+
+    if vline is not None:
+        ax.axvline(vline, color="red")
 
     return fig
 

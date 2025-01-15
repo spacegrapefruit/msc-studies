@@ -25,7 +25,7 @@ def fish_signal_counts(
     Counts the number of fish signals in a FISH image.
     """
     output_dir = OUTPUT_DIR / "fish_signal_counts"
-    shutil.rmtree(output_dir, ignore_errors=True)
+    # shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = fish_signal_counts_pipeline(
@@ -34,8 +34,8 @@ def fish_signal_counts(
         input_path_dapi=input_path_dapi,
         output_dir=output_dir,
         threshold_acridine=128,
-        threshold_fitc=128,
-        threshold_dapi=30,
+        threshold_fitc=80,
+        threshold_dapi=24,
     )
 
     logging.info("Cell analysis results")
@@ -49,6 +49,10 @@ def fish_signal_counts(
         logging.info(
             f"  Acridine={result['acridine_count']}, FITC={result['fitc_count']}, Ratio={result['acridine_to_fitc_ratio']}"
         )
+    # logging.info("---------------------")
+    # logging.info("Total cells: " + str(len(results)))
+    # logging.info("Total acridine signals: " + str(sum([r["acridine_count"] for r in results])))
+    # logging.info("Total FITC signals: " + str(sum([r["fitc_count"] for r in results])))
 
 
 @app.command()
@@ -57,7 +61,7 @@ def circuit_board_qa(input_path: str):
     Detects defects in a circuit board image.
     """
     output_dir = OUTPUT_DIR / "circuit_board_qa"
-    shutil.rmtree(output_dir, ignore_errors=True)
+    # shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = circuit_board_qa_pipeline(
@@ -81,7 +85,7 @@ def filled_bottles(input_path: str):
     Detects filled bottles in an image.
     """
     output_dir = OUTPUT_DIR / "filled_bottles"
-    shutil.rmtree(output_dir, ignore_errors=True)
+    # shutil.rmtree(output_dir, ignore_errors=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = filled_bottles_pipeline(
