@@ -294,11 +294,14 @@ def make_mean_intensity_plot(
     fig, ax = plt.subplots(2, 1)
 
     ax[0].plot(row_means)
+    ax[0].set_xlabel("Row")
     ax[0].set_ylabel("Row mean intensity")
+
     ax[1].plot(means_above)
     ax[1].plot(means_below)
     ax[1].plot(means_above - means_below)
-    ax[1].set_ylabel("Means")
+    ax[1].set_xlabel("Row")
+    ax[1].set_ylabel("Intensity mean/difference")
 
     return fig
 
@@ -318,10 +321,14 @@ def make_bottle_levels_plot(
     # plot bottle width
     ax[0].plot(bottle_width)
     ax[0].grid()
+    ax[0].set_ylabel("Bottle width")
+    ax[0].set_xlabel("Row")
 
     # plot angles
     ax[1].plot(angle1)
     ax[1].plot(angle2)
+    ax[1].set_ylabel("Angle, radians")
+    ax[1].set_xlabel("Row")
 
     # add lines at all levels
     ax[0].axvline(liquid_level, color="blue")
