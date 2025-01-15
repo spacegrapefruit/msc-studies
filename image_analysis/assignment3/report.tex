@@ -17,13 +17,17 @@
 
 \section{Introduction}
 
-The report is structured into three sections, each of which describes a different application of image processing to a real-world problem.
+As a final report in the trilogy, this document explores the practical applications of image processing techniques to real-world problems. It builds upon the theoretical foundation established in the previous assignments and demonstrates the application of these concepts to solve specific challenges in diverse domains.
 
-In \textbf{FISH Signal Counts}, we analyze fluorescence in situ hybridization (FISH) images to detect and quantify genetic mutations in tumor cells. This involves identifying mutations using fluorescent probes and quantifying the signals to understand the mutation distribution within individual cells.
+The first section, \textbf{Theoretical Background}, provides an overview of the theoretical background, including concepts such as thresholding, morphological operations, and image segmentation.
 
-In \textbf{Circuit Board Quality Assurance}, we analyze images of circuit boards to detect defects. This involves inspecting soldering regions, traces, and drilled holes using x-ray imaging and image processing techniques.
+The subsequent sections present three distinct applications of image processing techniques to real-world problems.
 
-In \textbf{Filled Bottles}, we analyze images of a production line to detect whether bottles are filled to the correct level. This involves detecting the liquid level in bottles using edge detection and intensity analysis.
+In \textbf{Application: FISH Signal Counts}, we analyze fluorescence in situ hybridization (FISH) images to detect and quantify genetic mutations in tumor cells. This involves identifying mutations using fluorescent probes and quantifying the signals to understand the mutation distribution within individual cells.
+
+In \textbf{Application: Circuit Board Quality Assurance}, we analyze images of circuit boards to detect defects. This involves inspecting soldering regions, traces, and drilled holes using x-ray imaging and image processing techniques.
+
+In \textbf{Application: Filled Bottles}, we analyze images of a production line to detect whether bottles are filled to the correct level. This involves detecting the liquid level in bottles using edge detection and intensity analysis.
 
 \newpage
 
@@ -33,7 +37,7 @@ In \textbf{Filled Bottles}, we analyze images of a production line to detect whe
 
 \section{Theoretical Background}
 
-Understanding the real-world applications described in the next sections of this report requires familiarity with several key concepts in digital image processing. This section provides a brief overview of these concepts, namely colour fundamentals, thresholding, morphological operations, image segmentation, and connected components labeling.
+Understanding the real-world applications described in the next sections of this report requires familiarity with several key concepts in digital image processing. This section provides a brief overview of these concepts.
 
 \subsection{Thresholding}
 
@@ -158,15 +162,7 @@ In summary, thresholding is a cornerstone of image segmentation tasks, and the c
 
 \subsection{Mathematical Morphology}
 
-% Mathematical morphology is a branch of image processing that focuses on the analysis and manipulation of structures within an image using concepts from set theory. In binary image analysis, an image is viewed as a set of coordinates (in \(\mathbb{Z}^2\)) for which the corresponding pixels are 1 (foreground). Morphological operations probe this image with a simpler shape or pattern called a \emph{structuring element}, allowing us to extract meaningful information about the shape and structure of objects.
-
-% % Morphological operations are image processing techniques that probe and transform the structure of \emph{objects} within a binary image. Two primary morphological operations are \textit{erosion} and \textit{dilation}. These operations are often used in combination to refine object boundaries and eliminate noise.
-
-% % Two additional morphological operations are \textit{opening} and \textit{closing}. Opening is defined as an erosion followed by dilation, while closing is a dilation followed by erosion. These operations are useful for removing small objects and closing gaps in binary images.
-
-\subsubsection{Fundamentals}
-
-% The cornerstone of mathematical morphology lies in its interpretation of an image as a set. Typically, for a binary image, the \emph{foreground} pixels form a set \(A \subset \mathbb{Z}^2\). Morphological operations then transform \(A\) in specific ways based on another set called the \emph{structuring element}, \(B \subset \mathbb{Z}^2\). By examining how \(A\) interacts with \(B\), morphological operations can expand or shrink objects, remove noise, fill holes, and extract relevant features.
+Mathematical morphology is a branch of image processing that focuses on the analysis and manipulation of structures within an image using concepts from set theory. A binary image \(A\) is viewed as a set of pixel coordinates in 2D integer space \(\mathbb{Z}^2\) for which the corresponding pixels are 1 (foreground) or 0 (background). Morphological operations probe this image with a simpler shape or pattern \(B \subset \mathbb{Z}^2\) called a \emph{structuring element}. By examining how \(A\) interacts with \(B\), morphological operations can expand or shrink objects, remove noise, fill holes, and extract relevant features.
 
 \subsubsection{Sets and Set Operations}
 
@@ -251,48 +247,115 @@ By repeating this procedure with new seeds on remaining unextracted parts of the
 
 \subsubsection{Hit-or-Miss Transformation}
 
-% The \emph{hit-or-miss} transformation detects a specific pattern in the image by looking for the arrangement of foreground and background pixels. Given two structuring elements \(B_1\) (defining foreground shape) and \(B_2\) (defining background shape), the hit-or-miss transform of \(A\) is:
+The \emph{hit-or-miss} transformation detects a specific pattern in the image by looking for the arrangement of foreground and background pixels. Given two structuring elements \(B_1\) (defining foreground shape) and \(B_2\) (defining background shape), the hit-or-miss transform of \(A\) is:
+\[
+  A \otimes (B_1, B_2) = (A \ominus B_1) \cap (A^c \ominus B_2).
+\]
+Here, \((B_1, B_2)\) is placed at a candidate point, and if \(B_1\) fits inside \(A\) (hit) and simultaneously \(B_2\) fits inside \(A^c\) (miss), that point is considered a valid detection.
+
+Hit-or-miss transforms are useful for detecting specific patterns or structures in binary images, such as corners, T-junctions, or other geometric arrangements. Note that hit-or-miss transforms do pixel-perfect matching.
+
+\newpage
+
+\subsection{Image Segmentation}
+
+Image segmentation is the process of partitioning a digital image into multiple segments (sets of pixels) to simplify its representation and make it more meaningful for analysis. It enables further operations such as object recognition, tracking, and scene understanding. This section provides an overview of segmentation techniques, focusing on point, line, and edge detection, edge linking, region growing, and thresholding.
+
+% Segmentation strategies generally aim to group pixels with similar features (e.g., intensity, color, texture) or to separate dissimilar ones. Two predominant approaches are:
+% \begin{itemize}
+%     \item \textbf{Discontinuity-based methods}: Segment images by detecting sudden changes in intensity or color (edges).
+%     \item \textbf{Similarity-based methods}: Segment images by grouping regions with homogeneous properties (e.g., region growing, thresholding).
+% \end{itemize}
+% In the following sections, we discuss different techniques associated with both approaches.
+
+\subsubsection{Point Detection}
+
+Discontinuities in intensity can manifest as isolated points, lines, or edges. Detecting these primitive features is often the first step in segmentation tasks.
+
+A point in an image can be identified if its intensity differs significantly from those of its surroundings. One simple approach is to use the \emph{Laplacian filter} at each pixel:
+% \begin{equation}
+%     \nabla^2 f(x, y) = f(x+1, y) + f(x-1, y) + f(x, y+1) + f(x, y-1) - 4f(x, y),
+% \end{equation}
+% where \(f(x, y)\) is the intensity at pixel \((x, y)\). If \(\nabla^2 f\) at a location exceeds a threshold, that location may be classified as a point of interest (e.g., a corner or a small isolated feature).
+
+\subsubsection{Line Detection}
+
+Line detection typically uses convolution masks designed to respond maximally to lines in certain orientations (e.g., 0°, 45°, 90°). For example, a line-detection mask for 0° orientation could be:
+\[
+M_0 = 
+\begin{bmatrix}
+-1 & 2 & -1
+\end{bmatrix},
+\]
+which, when convolved with the image, provides a strong response along horizontal lines. Similarly, rotated versions of \(M_0\) are used to detect lines at different angles.
+
+\subsubsection{Edge Detection}
+
+Edges generally correspond to significant shifts in intensity. A gradient-based approach uses first derivatives:
+\[
+G_x(x,y) = \frac{\partial f}{\partial x}, \quad
+G_y(x,y) = \frac{\partial f}{\partial y},
+\]
+using operators like Sobel. The gradient magnitude and direction are:
 % \[
-%   A \otimes (B_1, B_2) = (A \ominus B_1) \cap (A^c \ominus B_2).
+% \lVert \mathbf{G}(x,y) \rVert 
+% = \sqrt{(G_x(x,y))^2 + (G_y(x,y))^2},
+% \quad
+% \theta(x,y) 
+% = \tan^{-1}\!\bigl(\tfrac{G_y(x,y)}{G_x(x,y)}\bigr).
 % \]
-% Here, \((B_1, B_2)\) is placed at a candidate point, and if \(B_1\) fits inside \(A\) (hit) and simultaneously \(B_2\) fits inside \(A^c\) (miss), that point is considered a valid detection.
+Pixels with a gradient magnitude above a threshold \(T\) are flagged as potential edges.
 
-\subsubsection{``Free'' Coefficients}
+% \paragraph{Advanced Edge Detection --- Laplacian of Gaussian}
 
-% In some contexts, ``free'' coefficients refer to additional parameters in morphological structuring or adaptive filters that are not fixed \emph{a priori}. For example, in certain adaptive morphological filters, the size or shape of the structuring element might vary depending on local image properties. These free coefficients must be estimated or optimized based on the desired outcome (e.g., preserving certain structures while removing noise).
+% Another approach is to use the \emph{Laplacian of Gaussian (LoG)} operator, which smooths the image using a Gaussian filter to reduce noise, followed by the Laplacian. The LoG kernel can be expressed as:
+% \begin{equation}
+%     \text{LoG}(x, y) = \frac{\partial^2}{\partial x^2}\Bigl(G_\sigma(x, y)\Bigr) + \frac{\partial^2}{\partial y^2}\Bigl(G_\sigma(x, y)\Bigr),
+% \end{equation}
+% where \(G_\sigma(x, y)\) is a two-dimensional Gaussian with standard deviation \(\sigma\). The zero-crossings of the filtered result are used to locate edges.
 
-\subsubsection{Convex Hull}
+\subsubsection{Edge Linking}
 
-% The \emph{convex hull} of a set \(A\) in the plane is the smallest convex set that contains \(A\). Morphologically, one can approximate or compute the convex hull by iteratively applying dilation with a specific set of structuring elements (often line segments in several directions) until no further growth is possible. If the result is denoted by \(\mathrm{CH}(A)\), then:
-% \[
-%   \mathrm{CH}(A) = \bigcap \{\,C : A \subseteq C \,\wedge\, C \text{ is convex} \}.
-% \]
+% After detecting possible edge points, it is essential to form continuous edges by linking adjacent or nearby points. Edge linking methods can be divided into local and global approaches.
 
-\subsubsection{Thinning}
+\paragraph{Local Processing}
 
-% \emph{Thinning} reduces the thickness of objects to produce a skeletal representation. Formally, thinning is an iterative process of removing boundary points that do not break the connectivity or essential structure of the object. One approach is:
-% \[
-%   \text{Thin}(A) = A \setminus \bigcup_i \bigl( A \otimes (B_1^i, B_2^i) \bigr),
-% \]
-% where \((B_1^i, B_2^i)\) are a sequence of hit-or-miss structuring elements (rotated versions to remove boundary points from all directions). The iterative process stops when no more points can be removed.
+% In local processing, edge points are linked if they satisfy criteria such as \emph{distance} and \emph{direction} consistency. One simple method is:
+% \begin{enumerate}
+%     \item Compute the gradient direction at each edge point.
+%     \item For a given edge point, look at its neighbors in the corresponding direction.
+%     \item If a neighbor is also an edge point and their directions match, they are considered part of the same edge segment.
+% \end{enumerate}
 
-\subsubsection{Thickening}
+\paragraph{Global Processing --- Hough Transform}
 
-% \emph{Thickening} is the dual of thinning and is used to gradually enlarge the objects from within in a controlled way. Similar to thinning, it can be expressed in terms of hit-or-miss transforms:
-% \[
-%   \text{Thicken}(A) = A \cup \bigcup_i \bigl( A^c \otimes (B_1^i, B_2^i) \bigr)^c.
-% \]
-% Here, we aim to fill in gaps in objects without overly dilating them in all directions at once.
+% A more global approach is the \emph{Hough transform}, which maps edge points from the spatial domain \((x, y)\) to a parameter space. For line detection, the line equation is parameterized by \(\rho\) and \(\theta\):
+% \begin{equation}
+%     \rho = x \cos\theta + y \sin\theta.
+% \end{equation}
+% Each edge point \((x, y)\) in the image contributes a curve in the parameter space. Intersections of these curves in \((\rho, \theta)\)-space indicate the presence of a line. This approach is robust to noise and can handle discontinuities in lines more effectively than local methods.
 
-% \bigskip
-% In conclusion, mathematical morphology offers a powerful and intuitive toolkit for shape analysis and processing of binary images. By carefully selecting the structuring element and combining operations (such as erosion, dilation, opening, and closing), we can efficiently transform and interpret image structures for tasks like boundary detection, object segmentation, hole filling, thinning, and more. 
+\subsubsection{Region Growing}
 
+% Unlike discontinuity-based segmentation, region growing groups pixels into regions based on \emph{similarity criteria}. Starting from a set of \emph{seed points}, additional pixels are added if they are sufficiently similar in intensity or color to the region. A simple rule is:
+% \begin{equation}
+%     |f(x, y) - \mu_r| < T_r,
+% \end{equation}
+% where \(\mu_r\) is the average intensity of region \(r\), and \(T_r\) is a threshold. The process continues iteratively until no further pixels satisfy the similarity condition. Region growing is advantageous because it naturally incorporates spatial connectivity and can incorporate more complex similarity measures, such as texture or edge-based cues.
 
+\subsubsection{Multivariable Thresholding}
 
+% Thresholding is often extended to more than one channel or feature dimension. For instance, in color images using RGB channels, a pixel \((R, G, B)\) is included in a segment if:
+% \begin{equation}
+%     |R - \mu_R| < T_R, \quad |G - \mu_G| < T_G, \quad |B - \mu_B| < T_B,
+% \end{equation}
+% where \((\mu_R, \mu_G, \mu_B)\) and \((T_R, T_G, T_B)\) denote the mean intensity and thresholds in each channel, respectively. More sophisticated approaches can use joint probability distributions or feature vectors (e.g., intensity plus texture measures), determining whether a pixel belongs to a region by evaluating multi-dimensional distance metrics.
 
+\subsection{Connected Components Labeling}
 
+% TODO
 
-\section{FISH Signal Counts}
+\section{Application: FISH Signal Counts}
 
 % In the realm of biological sciences, image analysis facilitates the quantification and visualization of cellular structures and molecular signals, which are essential for understanding complex biological processes. Techniques such as thresholding, morphological operations, and connected components labeling are fundamental in processing fluorescence microscopy images to detect and analyze cells and their associated signals. This report delves into a pipeline designed to detect cells in fluorescence images, apply necessary image processing techniques, and calculate signal counts and ratios, providing a comprehensive overview for beginners in digital image analysis.
 
@@ -462,9 +525,7 @@ Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells
 
 \newpage
 
-\section{Circuit Board Quality Assurance}
-
-\subsection{Theoretical Background}
+\section{Application: Circuit Board Quality Assurance}
 
 % Digital image processing is an essential tool in quality assurance tasks, especially in domains where precision and automation play a critical role. X-ray imaging provides a non-invasive method for analyzing internal structures of objects, enabling detailed inspection of features that are otherwise concealed. 
 
@@ -529,9 +590,7 @@ Table~\ref{tab:results} shows the signal counts and ratios for a sample of cells
 
 \newpage
 
-\section{Filled Bottles}
-
-\subsection{Theoretical Background}
+\section{Application: Filled Bottles}
 
 % Digital image processing is a field that involves the analysis and manipulation of digital images using algorithms to extract information or enhance image quality. In the context of industrial automation, such as bottle filling detection, this field is crucial for quality control and efficiency. Key concepts include image segmentation, edge detection, and feature extraction, all of which are instrumental in identifying specific regions or characteristics within an image.
 
