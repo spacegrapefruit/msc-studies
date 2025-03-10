@@ -6,13 +6,15 @@ authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10, <3.12"
+python = ">=3.10.1, <3.11"
 pandas = "^2.2.3"
 numpy = "^2.2.3"
+scikit-learn = "^1.6.1"
 
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.9.10"
+scalene = "^1.5.51"
 
 [build-system]
 requires = ["poetry-core"]
