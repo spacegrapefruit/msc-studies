@@ -133,23 +133,6 @@ def parse_chunk(chunk_df: pd.DataFrame, vessel_states: dict) -> list[dict]:
     return flagged_coordinates
 
 
-def reader_process(file_path: str, chunk_size: int) -> list[pd.DataFrame]:
-    """Read CSV data in chunks."""
-    for chunk_df in pd.read_csv(
-        file_path,
-        usecols=["# Timestamp", "MMSI", "Latitude", "Longitude"],
-        parse_dates=["# Timestamp"],
-        dayfirst=True,
-        chunksize=chunk_size,
-    ):
-        chunk_df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
-
-        # assert sorted by Timestamp
-        assert chunk_df.Timestamp.is_monotonic_increasing
-
-        yield chunk_df
-
-
 def worker_process(chunk_df, vessel_states) -> None:
     """Worker process to parse data chunks and report alerts."""
     alerts = parse_chunk(chunk_df, vessel_states)
@@ -193,8 +176,20 @@ def main(args: argparse.Namespace) -> None:
 
     all_alerts = []
     vessel_states = {}
-    for chunk_df in reader_process(args.file_path, args.chunk_size):
+    for chunk_df in pd.read_csv(
+        file_path,
+        usecols=["# Timestamp", "MMSI", "Latitude", "Longitude"],
+        parse_dates=["# Timestamp"],
+        dayfirst=True,
+        chunksize=args.chunk_size,
+    ):
+        chunk_df.rename(columns={"# Timestamp": "Timestamp"}, inplace=True)
+
+        # assert sorted by Timestamp
+        assert chunk_df.Timestamp.is_monotonic_increasing
+
         all_alerts += worker_process(chunk_df, vessel_states)
+
     for mmsi, state in vessel_states.items():
         if len(state.possible_locations) > 1:
             logging.warning(
