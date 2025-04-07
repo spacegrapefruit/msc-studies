@@ -1,23 +1,22 @@
-[project]
+[tool.poetry]
 name = "assignment1"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "Your Name",email = "you@example.com"}
-]
+description = "TODO"
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.lt>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.12"
 ipykernel = "6.29.5"
-torch = "2.2.*"
-numpy = "1.*"
-torchvision = "0.17.*"
+torch = "2.4.*"
+#numpy = "1.*"
+torchvision = "0.19.*"
 pandas = "^2.2.3"
 boto3 = "^1.37.28"
 tqdm = "^4.67.1"
 matplotlib = "^3.10.1"
 opencv-python = "^4.11.0.86"
+ruff = "^0.11.4"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
