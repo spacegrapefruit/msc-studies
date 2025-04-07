@@ -47,8 +47,6 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
         optimizer.step()
         running_loss += loss.item()
 
-        if i > 1:
-            break
         if i % 40 == 0:
             print(f"  Step [{i}/{len(train_loader)}], Loss: {loss.item():.4f}")
 
@@ -90,7 +88,6 @@ def validate(model, dataloader, criterion, device, num_classes):
                 confusion[cls]["fp"] += fp
                 confusion[cls]["fn"] += fn
                 confusion[cls]["tn"] += tn
-            break
 
     avg_loss = val_loss / len(dataloader)
 
@@ -236,7 +233,7 @@ if __name__ == "__main__":
     )
 
     # hyperparameters, model setup
-    num_epochs = 1
+    num_epochs = 10
     learning_rate = 1e-3
 
     model = DeepLabV3Model(num_classes=num_classes).to(device)
@@ -246,7 +243,7 @@ if __name__ == "__main__":
 
     # main training loop
     best_val_loss = float("inf")
-    model_save_path = "../output/best_segmentation_model.pth"
+    model_save_path = "../output/segmenter_checkpoint.pth"
 
     for epoch in range(1, num_epochs + 1):
         train_loss = train_one_epoch(
