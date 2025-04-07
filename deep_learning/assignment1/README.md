@@ -105,4 +105,4 @@ All dependencies are managed using [Poetry](https://python-poetry.org/).
 - **Hyperparameters:**  
   Key hyperparameters such as learning rate, batch size, and number of epochs are defined in `task.py` and can be adjusted as needed.
 - **GPU Support:**
-  Ensure that your environment has access to a GPU for efficient training. The code is designed to utilize CUDA or MPS backends if available.
+  Ensure that your environment has access to a GPU for efficient training. The code is designed to utilize CUDA or MPS backends if available. Training takes approximately 50 minutes on GCP virtual machine with a Tesla T4 GPU.
