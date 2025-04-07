@@ -4,6 +4,26 @@ This repository contains a solution for a deep learning assignment focused on se
 
 ---
 
+## Model Performance
+
+An exemplary model was trained on 6 classes from the Open Images dataset, achieving the following performance metrics on the validation set:
+
+| Class | Accuracy | Precision | Recall | F1 Score | IoU |
+|-------|----------|-----------|--------|----------|-----|
+| Bird  | 0.9893   | 0.7745    | 0.6382 | 0.6998   | 0.5382 |
+| Cat   | 0.9511   | 0.6453    | 0.5552 | 0.5969   | 0.4254 |
+| Dog   | 0.9562   | 0.6744    | 0.3357 | 0.4483   | 0.2889 |
+| Person| 0.9891   | 0.0634    | 0.0425 | 0.0509   | 0.0261 |
+| Horse | 0.9799   | 0.6671    | 0.5168 | 0.5824   | 0.4108 |
+
+Some examples of segmentation results on the validation set are shown below:
+
+![Example #1](output/example_1.png)
+
+![Example #6](output/example_6.png)
+
+---
+
 ## Repository Structure
 
 - **python/**  
