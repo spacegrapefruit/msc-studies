@@ -1,12 +1,18 @@
 # Assignment 1: Image Segmentation
 
+## Author
+**Name:** Aleksandr Jan Smoliakov  
+**Email:** <aleksandr.smoliakov@mif.stud.vu.lt>  
+**Student ID:** 2416123  
+**Date:** 2025-04-07  
+
 This repository contains a solution for a deep learning assignment focused on semantic image segmentation using a modified DeepLabV3 model. The project uses the Open Images dataset to perform 6-class segmentation tasks on images, combining multiple masks for each image into a single segmentation map.
 
 ---
 
 ## Model Performance
 
-An exemplary model was trained on 6 classes from the Open Images dataset, achieving the following performance metrics on the validation set:
+An exemplary model was trained on 6 classes (including background) from the Open Images dataset, achieving the following performance metrics on the validation set:
 
 | Class | Accuracy | Precision | Recall | F1 Score | IoU |
 |-------|----------|-----------|--------|----------|-----|
