@@ -11,3 +11,5 @@ image_analysis/*/*/output/
 *.synctex.gz
 *.toc
 nessun_dorma.wav
+.DS_Store
+deep_learning/assignment1/data/
