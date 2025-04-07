@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 
 from matplotlib import pyplot as plt
+from matplotlib.patches import Patch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -46,18 +47,29 @@ def train_one_epoch(model, dataloader, optimizer, criterion, device):
         optimizer.step()
         running_loss += loss.item()
 
+        if i > 1:
+            break
         if i % 40 == 0:
             print(f"  Step [{i}/{len(train_loader)}], Loss: {loss.item():.4f}")
 
     return running_loss / len(dataloader)
 
 
-def validate(model, dataloader, criterion, device):
-    """Validate the model on the validation set and compute IoU."""
+# validation function with per-class metrics
+def validate(model, dataloader, criterion, device, num_classes):
+    """
+    Validate the model on the validation set and compute per-class metrics.
+    Metrics are computed for non-background classes (i.e. classes 1 ... num_classes-1).
+    Returns average loss and a dictionary of per-class metrics.
+    """
     model.eval()
 
     val_loss = 0.0
-    iou_scores = []
+
+    # init confusion counts for each class (excluding background)
+    confusion = {
+        cls: {"tp": 0, "fp": 0, "fn": 0, "tn": 0} for cls in range(1, num_classes)
+    }
 
     with torch.no_grad():
         for images, masks in tqdm(dataloader, desc="Validation"):
@@ -65,12 +77,92 @@ def validate(model, dataloader, criterion, device):
             outputs = model(images)
             loss = criterion(outputs, masks)
             val_loss += loss.item()
-            ious = compute_iou(outputs, masks, num_classes)
-            iou_scores.append(ious)
+
+            preds = torch.argmax(outputs, dim=1)
+            # Accumulate confusion metrics per class
+            for cls in range(1, num_classes):
+                tp = ((preds == cls) & (masks == cls)).sum().item()
+                fp = ((preds == cls) & (masks != cls)).sum().item()
+                fn = ((preds != cls) & (masks == cls)).sum().item()
+                tn = ((preds != cls) & (masks != cls)).sum().item()
+
+                confusion[cls]["tp"] += tp
+                confusion[cls]["fp"] += fp
+                confusion[cls]["fn"] += fn
+                confusion[cls]["tn"] += tn
+            break
 
     avg_loss = val_loss / len(dataloader)
-    avg_iou = np.nanmean(iou_scores, axis=0)
-    return avg_loss, avg_iou
+
+    # compute metrics for each class
+    metrics_per_class = {}
+    for cls, stats in confusion.items():
+        tp = stats["tp"]
+        fp = stats["fp"]
+        fn = stats["fn"]
+        tn = stats["tn"]
+        accuracy = (tp + tn) / (tp + tn + fp + fn + 1e-8)
+        precision = tp / (tp + fp + 1e-8)
+        recall = tp / (tp + fn + 1e-8)
+        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+        iou = tp / (tp + fp + fn + 1e-8)
+        metrics_per_class[cls] = {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "iou": iou,
+        }
+
+    return avg_loss, metrics_per_class
+
+
+def plot_example(image, ground_truth_mask, predicted_mask):
+    plt.figure(figsize=(16, 6))
+
+    # input image
+    ax1 = plt.subplot(1, 3, 1)
+    img_np = image.cpu().detach().numpy().transpose(1, 2, 0)
+    ax1.imshow(img_np)
+    ax1.set_title("Input Image")
+    ax1.axis("off")
+
+    # ground truth mask
+    ax2 = plt.subplot(1, 3, 2)
+    mask_img = np.zeros((*ground_truth_mask.shape, 3), dtype=np.uint8)
+    for class_idx in range(ground_truth_mask.max() + 1):
+        mask_img[ground_truth_mask == class_idx] = CLASS_COLOURS.get(
+            class_idx, (0, 0, 0)
+        )
+    ax2.imshow(mask_img)
+    ax2.set_title("Ground Truth Mask")
+    ax2.axis("off")
+    ax2.legend(
+        handles=legend_patches,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.05),
+        ncol=len(legend_patches),
+    )
+
+    # predicted mask
+    ax3 = plt.subplot(1, 3, 3)
+    predicted_mask = np.argmax(predicted_mask, axis=0)
+    predicted_mask_img = np.zeros((*predicted_mask.shape, 3), dtype=np.uint8)
+    for class_idx in range(predicted_mask.max() + 1):
+        predicted_mask_img[predicted_mask == class_idx] = CLASS_COLOURS.get(
+            class_idx, (0, 0, 0)
+        )
+    ax3.imshow(predicted_mask_img)
+    ax3.set_title("Predicted Mask")
+    ax3.axis("off")
+    ax3.legend(
+        handles=legend_patches,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.05),
+        ncol=len(legend_patches),
+    )
+
+    plt.tight_layout()
 
 
 if __name__ == "__main__":
@@ -144,13 +236,13 @@ if __name__ == "__main__":
     )
 
     # hyperparameters, model setup
-    num_epochs = 5
+    num_epochs = 1
     learning_rate = 1e-3
 
     model = DeepLabV3Model(num_classes=num_classes).to(device)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     # add a learning rate scheduler
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.5)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.5)
 
     # main training loop
     best_val_loss = float("inf")
@@ -162,9 +254,18 @@ if __name__ == "__main__":
         )
         print(f"Epoch [{epoch}/{num_epochs}] Training Loss: {train_loss:.4f}")
 
-        val_loss, avg_iou = validate(model, val_loader, cross_entropy_loss, device)
+        val_loss, metrics_per_class = validate(
+            model, val_loader, cross_entropy_loss, device, num_classes
+        )
         print(f"Epoch [{epoch}/{num_epochs}] Validation Loss: {val_loss:.4f}")
-        print(f"Epoch [{epoch}/{num_epochs}] Avg IoU (per class): {avg_iou}")
+
+        # print per-class metrics
+        for idx, metrics in metrics_per_class.items():
+            print(
+                f"  Class {idx_to_class[idx]:10}: Accuracy: {metrics['accuracy']:.4f}, "
+                f"Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}, "
+                f"F1: {metrics['f1']:.4f}, IoU: {metrics['iou']:.4f}"
+            )
 
         # save the model if the validation loss has improved
         if val_loss < best_val_loss:
@@ -172,7 +273,7 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), model_save_path)
             print("Model checkpoint saved.")
 
-        scheduler.step()
+        # scheduler.step()
 
     print("Training complete.")
 
@@ -208,37 +309,21 @@ if __name__ == "__main__":
     # visualize a few examples from the batch
     n_examples = min(len(batch_masks), 8)  # up to 8 examples
 
+    legend_patches = []
+    for class_idx, class_name in idx_to_class.items():
+        # Retrieve the color and normalize it to [0,1] for matplotlib patches.
+        color = CLASS_COLOURS.get(class_idx, (0, 0, 0))
+        color_norm = tuple(c / 255.0 for c in color)
+        patch = Patch(facecolor=color_norm, edgecolor="black", label=class_name)
+        legend_patches.append(patch)
+
     for idx in range(n_examples):
-        this_mask = batch_masks[idx]
-        this_output = batch_outputs[idx]
+        ground_truth_mask = batch_masks[idx]
+        predicted_mask = batch_outputs[idx]
 
-        plt.figure(figsize=(16, 6))
-
-        # input image
-        plt.subplot(1, 3, 1)
-        img_np = images[idx].cpu().detach().numpy().transpose(1, 2, 0)
-        plt.imshow(img_np)
-        plt.title("Input Image")
-        plt.axis("off")
-
-        # ground truth mask
-        plt.subplot(1, 3, 2)
-        mask_img = np.zeros((*this_mask.shape, 3), dtype=np.uint8)
-        for class_idx in range(this_mask.max() + 1):
-            mask_img[this_mask == class_idx] = CLASS_COLOURS.get(class_idx, (0, 0, 0))
-        plt.imshow(mask_img)
-        plt.title("Ground Truth Mask")
-        plt.axis("off")
-
-        # predicted mask
-        plt.subplot(1, 3, 3)
-        predicted_mask = np.argmax(this_output, axis=0)
-        predicted_mask_img = np.zeros((*predicted_mask.shape, 3), dtype=np.uint8)
-        for class_idx in range(predicted_mask.max() + 1):
-            predicted_mask_img[predicted_mask == class_idx] = CLASS_COLOURS.get(
-                class_idx, (0, 0, 0)
-            )
-        plt.imshow(predicted_mask_img)
-        plt.title("Predicted Mask")
-        plt.axis("off")
-        plt.show()
+        plot_example(
+            image=images[idx],
+            ground_truth_mask=ground_truth_mask,
+            predicted_mask=predicted_mask,
+        )
+        plt.savefig(f"../output/example_{idx}.png")

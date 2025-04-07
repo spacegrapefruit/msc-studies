@@ -32,7 +32,8 @@ class DeepLabV3Model(nn.Module):
         # Replace the classifier head to match the number of classes
         # The classifier is a Sequential container. Here, index 4 is replaced.
         self.deeplab.classifier[4] = nn.Conv2d(256, num_classes, kernel_size=1)
-        # Reinitialize the new classifier layer
+
+        # reinitialize the new classifier layer
         nn.init.kaiming_normal_(
             self.deeplab.classifier[4].weight, mode="fan_out", nonlinearity="relu"
         )
