@@ -79,12 +79,16 @@
 			\end{itemize}
 \end{frame}
 
-\section{Data Preparation}
+\section{Research Questions}
 
-\begin{frame}{Data Preparation}
+\begin{frame}{Research Questions}
 	\begin{itemize}
-		\item Preprocessed the data by extracting day-of-year and hour-of-day.
-		\item Assigned seasonal labels (winter, spring, summer, fall) based on month.
+		\item \textbf{Main goal:} Explore daily patterns in temperature data.
+		\item \textbf{Questions:}
+		\begin{itemize}
+			\item How do daily temperature curves differ by season?
+			\item Are there consistent patterns in the derivatives of the curves?
+		\end{itemize}
 	\end{itemize}
 \end{frame}
 
@@ -147,7 +151,7 @@
 
 \section{FPCA}
 
-\begin{frame}{Functional Principal Component Analysis (FPCA)}
+\begin{frame}{Functional Principal Component Analysis}
 	\begin{itemize}
 		\item Performed FPCA on the smoothed temperature curves.
 		\item First 3 PC explain over 98\% of the variance.
@@ -165,12 +169,20 @@
 		\begin{itemize}
 			\item FDA can reveal daily patterns in temperature data.
 		\end{itemize}
-		\item \textbf{Future directions:}
+		\item \textbf{Next steps:}
 		\begin{itemize}
-			\item Decide on the direction of the analysis (daily/seasonal patterns, possibly include more cities).
-			\item Continue exploring the data with more advanced FDA techniques.
+			\item Decide on the more specific direction of the analysis.
+			\item Incorporate yearly time series data.
+			\item Use Fourier basis functions for smoothing.
+			\item Dig deeper with more advanced FDA techniques.
 		\end{itemize}
 	\end{itemize}
+\end{frame}
+
+\begin{frame}{Thank You!}
+	\begin{center}
+		\Huge Thank you for your attention!
+	\end{center}
 \end{frame}
 
 \end{document}

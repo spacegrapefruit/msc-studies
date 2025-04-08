@@ -118,6 +118,28 @@ mumbai_data %>%
 ggsave("assets/unsmoothed_temperature_curves.png", width = 10, height = 6)
 ```
 
+## Functional Data Smoothing
+
+```{r functional-smoothing}
+# Split the data by date (each day becomes a replication)
+daily_data <- split(mumbai_data, mumbai_data$date)
+time_points <- 0:23
+
+# Build a temperature matrix where each column corresponds to one day
+temp_matrix <- sapply(daily_data, function(df) {
+    df <- df[order(df$hour_of_day), ]
+    df$tempC
+})
+
+# Define a B-spline basis and choose a smoothing parameter
+nbasis <- 8 # Adjust basis size based on desired smoothness
+basis_obj <- create.bspline.basis(rangeval = c(0, 23), nbasis = nbasis)
+lambda <- 0.5 # Tuning parameter for smoothing
+
+# Smooth the data using Data2fd to create an fd object
+fd_object <- Data2fd(argvals = time_points, y = temp_matrix, basisobj = basis_obj, lambda = lambda)
+```
+
 ## Smoothing Error vs. Smoothing Parameter
 
 ```{r smoothing-lambda-selection}
@@ -148,28 +170,6 @@ ggplot(gcv_df, aes(x = lambda, y = gcv)) +
         y = "GCV Error"
     )
 ggsave("assets/lambda_vs_gcv.png", width = 8, height = 6)
-```
-
-## Functional Data Smoothing
-
-```{r functional-smoothing}
-# Split the data by date (each day becomes a replication)
-daily_data <- split(mumbai_data, mumbai_data$date)
-time_points <- 0:23
-
-# Build a temperature matrix where each column corresponds to one day
-temp_matrix <- sapply(daily_data, function(df) {
-    df <- df[order(df$hour_of_day), ]
-    df$tempC
-})
-
-# Define a B-spline basis and choose a smoothing parameter
-nbasis <- 8 # Adjust basis size based on desired smoothness
-basis_obj <- create.bspline.basis(rangeval = c(0, 23), nbasis = nbasis)
-lambda <- 0.5 # Tuning parameter for smoothing
-
-# Smooth the data using Data2fd to create an fd object
-fd_object <- Data2fd(argvals = time_points, y = temp_matrix, basisobj = basis_obj, lambda = lambda)
 ```
 
 ## Plotting Smoothed Temperature Curves
