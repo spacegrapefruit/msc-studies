@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "assignment2"
+version = "0.1.0"
+description = ""
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.lt>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10, <3.12"
+dash = "^3.0.2"
+dash-bootstrap-components = "^2.0.1"
+firebase-admin = "^6.7.0"
+dash-table = "^5.0.0"
+numpy = "^2.2.4"
+pandas = "^2.2.3"
+textblob = "^0.19.0"
+gunicorn = "^23.0.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

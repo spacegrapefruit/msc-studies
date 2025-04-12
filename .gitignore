@@ -7,7 +7,9 @@ image_analysis/*/*/output/
 *.fdb_latexmk
 *.fls
 *.log
+*.nav
 *.out
+*.snm
 *.synctex.gz
 *.toc
 nessun_dorma.wav
