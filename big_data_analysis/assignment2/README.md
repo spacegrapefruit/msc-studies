@@ -11,28 +11,34 @@ assignment2/
     ├── data_loader.py        # Module for fetching movie reviews from the TMDB API
     └── sentiment_analysis.py # Module for performing sentiment analysis
 ├── Dockerfile                # Docker configuration
-├── Makefile
-├── pyproject.toml
-├── poetry.lock
+├── Makefile                  # Project-specific build and run commands
+├── pyproject.toml            # Project configuration file for Poetry
+├── poetry.lock               # Lockfile for project dependencies
 └── README.md                 # This file
 ```
 
 ## Setup
 
-# TODO: install Poetry
-
 1. **Obtain a TMDB API Key**:
    - Sign up at [TMDB](https://www.themoviedb.org/documentation/api) and obtain a free API key.
    - Set your TMDB API key as an environment variable:
-     
-     ```bash
-     export TMDB_API_KEY=your_tmdb_api_key
-     ```
+
+        ```bash
+        export TMDB_API_KEY=your_tmdb_api_key
+        ```
 
 2. **Install dependencies locally** (optional):
-   ```bash
-   make install
-   ```
+    - Install Poetry:
+
+        ```bash
+        pip install poetry
+        ```
+
+    - Install the dependencies using Poetry:
+     
+        ```bash
+        make install
+        ```
 
 ## Running Locally
 
