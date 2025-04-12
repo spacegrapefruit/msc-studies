@@ -1,4 +1,4 @@
-all: lint install #test
+all: lint install run
 
 POETRY-EXECUTOR=poetry run
 
@@ -7,9 +7,9 @@ lint:
 	$(POETRY-EXECUTOR) ruff check . --exit-non-zero-on-fix
 	$(POETRY-EXECUTOR) ruff format . --check
 
-# Run all tests
-test:
-	$(POETRY-EXECUTOR) pytest --disable-warnings -v
+# # Run all tests
+# test:
+# 	$(POETRY-EXECUTOR) pytest --disable-warnings -v
 
 # Fix formatting
 format:
@@ -18,3 +18,6 @@ format:
 
 install:
 	poetry install --no-root
+
+run:
+	$(POETRY-EXECUTOR) python python/app.py
