@@ -90,7 +90,10 @@ app.layout = html.Div(
     [Input("search-button", "n_clicks"), Input("keyword-input", "n_submit")],
     [State("keyword-input", "value")],
 )
-def update_output(n_clicks, n_submit, keyword):
+def update_output(n_clicks: int, n_submit: int, keyword: str) -> tuple:
+    """Fetch and update reviews based on the keyword input."""
+    # if no keyword is provided, use the initial reviews
+    # otherwise, fetch reviews based on the keyword
     if not keyword:
         reviews = initial_reviews
     else:

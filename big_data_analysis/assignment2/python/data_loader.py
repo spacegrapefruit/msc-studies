@@ -5,7 +5,7 @@ from functools import lru_cache
 
 
 @lru_cache(maxsize=None)
-def load_reviews(keyword=None):
+def load_reviews(keyword: str = None) -> list:
     """
     Load movie reviews using TMDB API.
 
@@ -14,13 +14,13 @@ def load_reviews(keyword=None):
 
     Returns:
         A list of review dictionaries with keys:
-          'text' (mapped from review content) and 'author'.
+          'text' (mapped from review content) and 'author'
     """
     api_key = os.environ["TMDB_API_KEY"]
 
-    # determine which movie to fetch reviews for.
+    # determine which movie to fetch reviews for
     if keyword:
-        # search for a movie using the keyword.
+        # search for a movie using the keyword
         search_url = "https://api.themoviedb.org/3/search/movie"
         params = {"api_key": api_key, "query": keyword, "language": "en-US"}
         search_response = requests.get(search_url, params=params)
@@ -35,7 +35,7 @@ def load_reviews(keyword=None):
                 f"Error searching movie: {search_response.status_code} - {search_response.text}"
             )
     else:
-        # if no keyword is provided, fetch popular movies.
+        # if no keyword is provided, fetch popular movies
         popular_url = "https://api.themoviedb.org/3/movie/popular"
         params = {"api_key": api_key, "language": "en-US"}
         popular_response = requests.get(popular_url, params=params)
@@ -50,7 +50,7 @@ def load_reviews(keyword=None):
                 f"Error fetching popular movies: {popular_response.status_code} - {popular_response.text}"
             )
 
-    # fetch reviews for the selected movie.
+    # fetch reviews for the selected movie
     reviews_url = f"https://api.themoviedb.org/3/movie/{movie_id}/reviews"
     params = {"api_key": api_key, "language": "en-US"}
     reviews_response = requests.get(reviews_url, params=params)

@@ -7,10 +7,6 @@ lint:
 	$(POETRY-EXECUTOR) ruff check . --exit-non-zero-on-fix
 	$(POETRY-EXECUTOR) ruff format . --check
 
-# # Run all tests
-# test:
-# 	$(POETRY-EXECUTOR) pytest --disable-warnings -v
-
 # Fix formatting
 format:
 	$(POETRY-EXECUTOR) ruff format .

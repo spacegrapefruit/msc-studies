@@ -1,7 +1,7 @@
 from textblob import TextBlob
 
 
-def get_sentiment(text):
+def get_sentiment(text: str) -> str:
     """Return the sentiment category for a given text."""
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity
@@ -13,14 +13,14 @@ def get_sentiment(text):
         return "Neutral"
 
 
-def analyze_tweets(tweets):
+def analyze_tweets(tweets: list) -> tuple:
     """
     Analyze a list of reviews.
 
-    Each review is expected to have a 'text' key.
+    Each review is expected to have a 'text' key with the review content.
     Returns:
-        - The list of reviews with an added 'sentiment' key.
-        - A dictionary with sentiment distribution counts.
+        - The list of reviews with an added 'sentiment' key
+        - A dictionary with sentiment distribution counts
     """
     sentiment_distribution = {"Positive": 0, "Negative": 0, "Neutral": 0}
 
