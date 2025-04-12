@@ -51,9 +51,15 @@ assignment2/
 
 ## Running with Docker
 
-1. Build the Docker image:
+1.
+   a) Build the Docker image:
    ```bash
    docker build -t sentiment-dashboard .
+   ```
+
+   b) Alternatively, download the pre-built image from Docker Hub:
+   ```bash
+   docker pull ghcr.io/spacegrapefruit/sentiment-dashboard:latest
    ```
 2. Run the container (passing the TMDB API key environment variable):
    ```bash
