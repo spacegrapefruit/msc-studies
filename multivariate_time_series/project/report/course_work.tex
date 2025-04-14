@@ -1,0 +1,211 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[fleqn,10pt]{SelfArx} % Document font size and equations flushed left
+
+\setlength{\columnsep}{0.55cm} % Distance between the two columns of text
+\setlength{\fboxrule}{0.75pt} % Width of the border around the abstract
+
+\definecolor{color1}{RGB}{0,0,90} % Color of the article title and sections
+\definecolor{color2}{RGB}{0,20,20} % Color of the boxes behind the abstract and headings
+
+\newlength{\tocsep} 
+\setlength\tocsep{1.5pc} % Sets the indentation of the sections in the table of contents
+\setcounter{tocdepth}{3} % Show only three levels in the table of contents section: sections, subsections and subsubsections
+
+\usepackage{lipsum} % Required to insert dummy text
+\usepackage{lastpage} %last page
+\usepackage{hyperref} % For hyperlinks
+\usepackage{url} % For hyperlinks
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE INFORMATION
+%----------------------------------------------------------------------------------------
+
+\JournalInfo{Multivariate Time Series and Financial Econometrics, No. 1, 1-\pageref{LastPage}, 2025} 
+\Archive{} % Additional notes (e.g. copyright, DOI, review/research article)
+
+\PaperTitle{Multivariate Time Series Analysis of Air Quality Data in India} % Article title
+
+\Authors{Aleksandr Jan Smoliakov \textsuperscript{1}*}
+\affiliation{\textsuperscript{1}\textit{Department of Econometric Analysis, Faculty of Mathematics and Informatics, Vilnius University}} % Author affiliation
+\affiliation{*\textbf{Corresponding author}: aleksandr.smoliakov@mif.stud.vu.lt} % Corresponding author
+
+\Keywords{air pollution --- multivariate time series} % Keywords - if you don't want any simply remove all the text between the curly brackets
+\newcommand{\keywordname}{Keywords} % Defines the keywords heading name
+
+%----------------------------------------------------------------------------------------
+%	ABSTRACT
+%----------------------------------------------------------------------------------------
+
+\Abstract{This project blueprint outlines an investigation into the application of multivariate time series models, inspired by techniques from financial econometrics, to forecast the air quality in Indian cities. Using hourly measurements of seven pollutant concentrations across 20 cities collected between 2015 and 2020, the study will aim to assess the temporal dynamics between pollutants. The discussed methodologies will form the foundation for subsequent steps involving data transformation, model estimation, and interpretation of forecasting results.}
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\flushbottom % Makes all text pages the same height
+
+\maketitle % Print the title and abstract box
+
+\tableofcontents % Print the contents section
+
+\thispagestyle{empty} % Removes page numbering from the first page
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE CONTENTS
+%----------------------------------------------------------------------------------------
+
+\section*{Introduction} % The \section*{} command stops section numbering
+
+\addcontentsline{toc}{section}{\hspace*{-\tocsep}Introduction} % Adds this section to the table of contents with negative horizontal space equal to the indent for the numbered sections
+
+Urban air quality is a critical public health and environmental issue, especially in rapidly urbanizing regions. Accurate forecasting of air quality indicators, such as pollutant (e.g., PM2.5, PM10, NO2, CO) concentrations and their composite measures like the Air Quality Index (AQI), is essential for formulating timely policy interventions.
+
+While univariate models (e.g., ARIMA) offer a baseline for prediction, complex datasets with interconnected variables require the advanced analytical capabilities of multivariate time series models. In financial econometrics, multivariate approaches -- such as vector autoregression (VAR) and vector autoregressive moving average (VARMA) models -- have been used to model the interdependencies among multiple time series, capturing interactions between variables and their lagged effects. These methodologies could be equally applicable to environmental datasets where pollutant concentrations interact over time.
+
+In this project, I propose to analyze the \emph{Air Quality Data in India (2015--2020)} dataset, which contains hourly observations of seven pollutant concentrations (as well as the Air Quality Index, AQI) measured in 20 Indian cities.
+
+The objective of this project is to apply multivariate models to capture the dynamic interactions among pollutants (possibly incorporating spatial dependencies) and provide robust air quality forecasts for Indian cities.
+
+%------------------------------------------------
+
+\section{Literature Review}
+Recent studies on air quality forecasting have adopted various time series modeling techniques, ranging from univariate to multivariate approaches. This section reviews relevant contributions in the field, focusing on the strengths and limitations of different methodologies.
+
+\subsection*{Analysis of Air Quality using Univariate and Multivariate Time Series Models}
+Sethi and Mittal (2020) investigate the prediction of daily Air Quality Index (AQI) values in Gurugram, India by comparing univariate and multivariate time series methods \cite{sethi2020}. Using ARIMA and VAR models, they demonstrate that, for their dataset, a simpler univariate ARIMA model gives more accurate predictions of AQI than the multivariate counterpart. The authors conclude that multivariate VAR models faced instability in handling the additional noise introduced by interdependent pollutant series. This paper provides valuable insights on the challenges of multivariate data modeling, especially the impact of differencing and parameter selection on model stability.
+
+\subsection*{Multivariate Time Series Modelling for Urban Air Quality}
+Hajmohammadi and Heydecker (2021) focus on urban air quality forecasting in multiple meteorological stations in London. The authors compare seasonal ARMA (SARMA) models with vector ARMA (VARMA) models, which account for both spatial and temporal dependencies. The study demonstrates that while SARMA models capture individual station trends, VARMA outperforms it by accounting for cross-station interactions. The findings emphasize that in complex urban environments, accounting for spatial interactions can significantly enhance predictive performance. This concept could be applicable for modeling pollutant interdependencies in the larger-scale Indian context.
+
+\subsection*{Forecasting of Particulate Matter with a Hybrid ARIMA Model Based on Wavelet Transformation and Seasonal Adjustment}
+Aladağ (2021) introduces a hybrid modeling approach that integrates seasonal adjustment, wavelet transformation, and ARIMA \cite{aladag2021}. Applied to forecasting PM10 in Erzurum, Turkey, this method combines a classical ARIMA model with wavelet decomposition, capturing both low-frequency trends and high-frequency variations present in the pollutant time series. This study provides a method for addressing seasonality and nonstationarity -- features also present in air quality data -- by decomposing the series before reassembling the forecasted components.
+
+\medskip
+
+The insights from these studies suggest the use of multivariate frameworks in forecasting. Techniques from financial econometrics are shown to be effective when adapted to environmental datasets. Advanced data transformation methods, such as wavelet decomposition, can also enhance model performance. The project will thus build on these methodologies to analyze the air quality data in India.
+
+%------------------------------------------------
+
+% \section{Methods}
+
+% \begin{figure*}[ht]\centering % Using \begin{figure*} makes the figure take up the entire width of the page
+% \includegraphics[width=\linewidth]{view}
+% \caption{Wide Picture}
+% \label{fig:view}
+% \end{figure*}
+
+% \lipsum[4] % Dummy text
+
+% \begin{equation}
+% \cos^3 \theta =\frac{1}{4}\cos\theta+\frac{3}{4}\cos 3\theta
+% \label{eq:refname2}
+% \end{equation}
+
+% \lipsum[5] % Dummy text
+
+% \begin{enumerate}[noitemsep] % [noitemsep] removes whitespace between the items for a compact look
+% \item First item in a list
+% \item Second item in a list
+% \item Third item in a list
+% \end{enumerate}
+
+% \subsection{Subsection}
+
+% \lipsum[6] % Dummy text
+
+% \paragraph{Paragraph} \lipsum[7] % Dummy text
+% \paragraph{Paragraph} \lipsum[8] % Dummy text
+
+% \subsection{Subsection}
+
+% \lipsum[9] % Dummy text
+
+% \begin{figure}[ht]\centering
+% \includegraphics[width=\linewidth]{results}
+% \caption{In-text Picture}
+% \label{fig:results}
+% \end{figure}
+
+% Reference to Figure \ref{fig:results}.
+
+% %------------------------------------------------
+
+% \section{Results and Discussion}
+
+% \lipsum[10] % Dummy text
+
+% \subsection{Subsection}
+
+% \lipsum[11] % Dummy text
+
+% \begin{table}[hbt]
+% \caption{Table of Grades}
+% \centering
+% \begin{tabular}{llr}
+% \toprule
+% \multicolumn{2}{c}{Name} \\
+% \cmidrule(r){1-2}
+% First name & Last Name & Grade \\
+% \midrule
+% John & Doe & $7.5$ \\
+% Richard & Miles & $2$ \\
+% \bottomrule
+% \end{tabular}
+% \label{tab:label}
+% \end{table}
+
+% \subsubsection{Subsubsection}
+
+% \lipsum[12] % Dummy text
+
+% \begin{description}
+% \item[Word] Definition
+% \item[Concept] Explanation
+% \item[Idea] Text
+% \end{description}
+
+% \subsubsection{Subsubsection}
+
+% \lipsum[13] % Dummy text
+
+% \begin{itemize}[noitemsep] % [noitemsep] removes whitespace between the items for a compact look
+% \item First item in a list
+% \item Second item in a list
+% \item Third item in a list
+% \end{itemize}
+
+% \subsubsection{Subsubsection}
+
+% \lipsum[14] % Dummy text
+
+% \subsection{Subsection}
+
+% \lipsum[15-23] % Dummy text
+
+% So long and thanks for all the fish \cite{Figueredo:2009dg}.
+
+%----------------------------------------------------------------------------------------
+%	REFERENCE LIST
+%----------------------------------------------------------------------------------------
+
+\bibliographystyle{unsrt}
+
+\begin{thebibliography}{9}
+
+\bibitem{aladag2021}
+Aladağ, E. (2021). \textit{Forecasting of Particulate Matter with a Hybrid ARIMA Model Based on Wavelet Transformation and Seasonal Adjustment}. Urban Climate. \url{https://doi.org/10.1016/j.uclim.2021.100930}.
+
+\bibitem{hajmohammadi2021}
+Hajmohammadi, H. and Heydecker, B. (2021). \textit{Multivariate time series modelling for urban air quality}. Urban Climate. \url{https://doi.org/10.1016/j.uclim.2021.100834}.
+
+\bibitem{sethi2020}
+Sethi, J.K. and Mittal, M. (2020). \textit{Analysis of Air Quality using Univariate and Multivariate Time Series Models}. \url{https://doi.org/10.1109/Confluence47617.2020.9058303}.
+
+\end{thebibliography}
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
