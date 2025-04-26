@@ -8,7 +8,7 @@ output: html_notebook
 knitr::opts_chunk$set(echo = TRUE)
 # TODO: Replace with a proper mechanism for setting environment variables
 setwd("~/msc-studies/functional_data_analysis/notebooks")
-INPUT_DIR <- "~/msc-studies/functional_data_analysis/data/input"
+input_dir <- "~/msc-studies/functional_data_analysis/data/input"
 ```
 
 ```{r libraries}
@@ -28,27 +28,29 @@ library(stringr)
 # Load the weather data from multiple CSV files
 data_weather <- list()
 
-for (file_name in dir(INPUT_DIR)) {
-    # Extract city name from file name (e.g., "bombay.csv" -> "Bombay")
-    city_name <- strsplit(file_name, "\\.")[[1]][1]
-    city_name <- paste0(toupper(substring(city_name, 1, 1)), substring(city_name, 2))
+for (file_name in dir(input_dir)) {
+  # Extract city name from file name (e.g., "bombay.csv" -> "Bombay")
+  city_name <- strsplit(file_name, "\\.")[[1]][1]
+  city_name <- paste0(
+    toupper(substring(city_name, 1, 1)), substring(city_name, 2)
+  )
 
-    file_path <- file.path(INPUT_DIR, file_name)
-    this_data <- read_csv(file_path, show_col_types = FALSE)
-    this_data$City <- city_name
-    data_weather[[length(data_weather) + 1]] <- this_data
+  file_path <- file.path(input_dir, file_name)
+  this_data <- read_csv(file_path, show_col_types = FALSE)
+  this_data$City <- city_name
+  data_weather[[length(data_weather) + 1]] <- this_data
 
-    cat("Loaded weather data for city", city_name, "\n")
+  cat("Loaded weather data for city", city_name, "\n")
 }
 
 # Combine all city data and clean up variable names
 data_weather <- bind_rows(data_weather) %>%
-    select(-uvIndex...6) %>% # Remove problematic column
-    rename(uvIndex = uvIndex...7) %>% # Rename column for clarity
-    mutate(
-        day_of_year = as.numeric(format(as.Date(date_time), "%j")),
-        hour_of_day = as.numeric(format(as.POSIXct(date_time), "%H"))
-    )
+  select(-uvIndex...6) %>% # Remove problematic column
+  rename(uvIndex = uvIndex...7) %>% # Rename column for clarity
+  mutate(
+    day_of_year = as.numeric(format(as.Date(date_time), "%j")),
+    hour_of_day = as.numeric(format(as.POSIXct(date_time), "%H"))
+  )
 
 # Display a summary of the loaded data
 summary(data_weather)
@@ -59,25 +61,25 @@ summary(data_weather)
 ```{r density-plots}
 # Density plot: Temperature vs Day of Year
 data_weather %>%
-    filter(City == "Bombay", grepl("2011", date_time)) %>%
-    ggplot(aes(x = day_of_year, y = tempC)) +
-    geom_density_2d_filled() +
-    labs(
-        title = "Density Plot: Temperature vs Day of Year",
-        x = "Day of Year",
-        y = "Temperature (Celsius)"
-    )
+  filter(City == "Bombay", grepl("2011", date_time)) %>%
+  ggplot(aes(x = day_of_year, y = tempC)) +
+  geom_density_2d_filled() +
+  labs(
+    title = "Density Plot: Temperature vs Day of Year",
+    x = "Day of Year",
+    y = "Temperature (Celsius)"
+  )
 
 # Density plot: Temperature vs Hour of Day
 # data_weather %>%
-#     filter(City == "Bombay", grepl("2011", date_time)) %>%
-#     ggplot(aes(x = hour_of_day, y = tempC)) +
-#     geom_density_2d_filled() +
-#     labs(
-#         title = "Density Plot: Temperature vs Hour of Day",
-#         x = "Hour of Day",
-#         y = "Temperature (Celsius)"
-#     )
+#   filter(City == "Bombay", grepl("2011", date_time)) %>%
+#   ggplot(aes(x = hour_of_day, y = tempC)) +
+#   geom_density_2d_filled() +
+#   labs(
+#     title = "Density Plot: Temperature vs Hour of Day",
+#     x = "Hour of Day",
+#     y = "Temperature (Celsius)"
+#   )
 ```
 
 ## Unsmoothed Temperature Curves by Season
@@ -85,34 +87,34 @@ data_weather %>%
 ```{r unsmoothed-curves}
 # Subset data for Mumbai (Bombay) in 2011 and add seasonal information
 mumbai_data <- data_weather %>%
-    filter(City == "Bombay", grepl("2011", date_time)) %>%
-    mutate(
-        date = as.Date(date_time),
-        month = month(date),
-        season = case_when(
-            month %in% c(12, 1, 2) ~ "winter",
-            month %in% c(3, 4, 5) ~ "spring",
-            month %in% c(6, 7, 8) ~ "summer",
-            month %in% c(9, 10, 11) ~ "fall"
-        )
-    ) %>%
-    arrange(date_time)
+  filter(City == "Bombay", grepl("2011", date_time)) %>%
+  mutate(
+    date = as.Date(date_time),
+    month = month(date),
+    season = case_when(
+      month %in% c(12, 1, 2) ~ "winter",
+      month %in% c(3, 4, 5) ~ "spring",
+      month %in% c(6, 7, 8) ~ "summer",
+      month %in% c(9, 10, 11) ~ "fall"
+    )
+  ) %>%
+  arrange(date_time)
 
 # Plot unsmoothed temperature curves with seasonal colors
 mumbai_data %>%
-    ggplot(aes(x = hour_of_day, y = tempC, color = season, group = date)) +
-    geom_line(alpha = 0.4) +
-    scale_color_manual(
-        values = c(
-            "winter" = "blue", "spring" = "green",
-            "summer" = "red", "fall" = "orange"
-        )
-    ) +
-    labs(
-        title = "Temperature Curves for Mumbai (2011)",
-        x = "Hour",
-        y = "Temperature"
+  ggplot(aes(x = hour_of_day, y = tempC, color = season, group = date)) +
+  geom_line(alpha = 0.4) +
+  scale_color_manual(
+    values = c(
+      "winter" = "blue", "spring" = "green",
+      "summer" = "red", "fall" = "orange"
     )
+  ) +
+  labs(
+    title = "Temperature Curves for Mumbai (2011)",
+    x = "Hour",
+    y = "Temperature"
+  )
 
 # Save the unsmoothed curves plot
 ggsave("assets/unsmoothed_temperature_curves.png", width = 10, height = 6)
@@ -127,8 +129,8 @@ time_points <- 0:23
 
 # Build a temperature matrix where each column corresponds to one day
 temp_matrix <- sapply(daily_data, function(df) {
-    df <- df[order(df$hour_of_day), ]
-    df$tempC
+  df <- df[order(df$hour_of_day), ]
+  df$tempC
 })
 
 # Define a B-spline basis and choose a smoothing parameter
@@ -137,7 +139,12 @@ basis_obj <- create.bspline.basis(rangeval = c(0, 23), nbasis = nbasis)
 lambda <- 0.5 # Tuning parameter for smoothing
 
 # Smooth the data using Data2fd to create an fd object
-fd_object <- Data2fd(argvals = time_points, y = temp_matrix, basisobj = basis_obj, lambda = lambda)
+fd_object <- Data2fd(
+  argvals = time_points,
+  y = temp_matrix,
+  basisobj = basis_obj,
+  lambda = lambda
+)
 ```
 
 ## Smoothing Error vs. Smoothing Parameter
@@ -149,10 +156,14 @@ gcv_errors <- numeric(length(lambda_range))
 
 # Loop over each lambda value and compute the smoothing error (GCV)
 for (i in seq_along(lambda_range)) {
-    fdParobj <- fdPar(basis_obj, Lfdobj = 2, lambda = lambda_range[i])
-    smooth_result <- smooth.basis(argvals = time_points, y = temp_matrix, fdParobj = fdParobj)
-    # Here, we sum the GCV values across days; alternatively, you could take the mean
-    gcv_errors[i] <- sum(smooth_result$gcv)
+  fd_par_obj <- fdPar(basis_obj, Lfdobj = 2, lambda = lambda_range[i])
+  smooth_result <- smooth.basis(
+    argvals = time_points,
+    y = temp_matrix,
+    fd_par_obj = fd_par_obj
+  )
+  # Here, we sum the GCV values across days; alternatively, take the mean
+  gcv_errors[i] <- sum(smooth_result$gcv)
 }
 
 # Create a data frame for plotting
@@ -160,15 +171,18 @@ gcv_df <- data.frame(lambda = lambda_range, gcv = gcv_errors)
 
 # Plot smoothing error vs lambda using ggplot2 with a logarithmic x-axis
 ggplot(gcv_df, aes(x = lambda, y = gcv)) +
-    geom_line() +
-    geom_point() +
-    scale_x_log10() +
-    geom_vline(xintercept = lambda_range[which.min(gcv_errors)], linetype = "dashed") +
-    labs(
-        title = "Smoothing Error vs. Smoothing Parameter (Lambda)",
-        x = expression(lambda),
-        y = "GCV Error"
-    )
+  geom_line() +
+  geom_point() +
+  scale_x_log10() +
+  geom_vline(
+    xintercept = lambda_range[which.min(gcv_errors)],
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Smoothing Error vs. Smoothing Parameter (Lambda)",
+    x = expression(lambda),
+    y = "GCV Error"
+  )
 ggsave("assets/lambda_vs_gcv.png", width = 8, height = 6)
 ```
 
@@ -181,39 +195,44 @@ smoothed_vals <- eval.fd(grid, fd_object)
 
 # Convert the smoothed values to a long-format data frame for ggplot
 smoothed_df <- data.frame(hour = grid, smoothed_vals)
-smoothed_long <- pivot_longer(smoothed_df, cols = -hour, names_to = "date", values_to = "temp")
+smoothed_long <- pivot_longer(
+  smoothed_df,
+  cols = -hour,
+  names_to = "date",
+  values_to = "temp"
+)
 
 # Convert the date labels to Date format and add seasonal information
 smoothed_long$date <- as.Date(
-    str_replace_all(smoothed_long$date, "\\.", "-") %>% str_replace_all("X", "")
+  str_replace_all(smoothed_long$date, "\\.", "-") %>% str_replace_all("X", "")
 )
 
 smoothed_long <- smoothed_long %>%
-    mutate(
-        month = month(date),
-        season = case_when(
-            month %in% c(12, 1, 2) ~ "winter",
-            month %in% c(3, 4, 5) ~ "spring",
-            month %in% c(6, 7, 8) ~ "summer",
-            month %in% c(9, 10, 11) ~ "fall"
-        )
+  mutate(
+    month = month(date),
+    season = case_when(
+      month %in% c(12, 1, 2) ~ "winter",
+      month %in% c(3, 4, 5) ~ "spring",
+      month %in% c(6, 7, 8) ~ "summer",
+      month %in% c(9, 10, 11) ~ "fall"
     )
+  )
 
 # Plot the smoothed temperature curves with seasonal coloring
 smoothed_long %>%
-    ggplot(aes(x = hour, y = temp, group = date, color = season)) +
-    geom_line(alpha = 0.4) +
-    scale_color_manual(
-        values = c(
-            "winter" = "blue", "spring" = "green",
-            "summer" = "red", "fall" = "orange"
-        )
-    ) +
-    labs(
-        title = "Smoothed Temperature Curves for Mumbai (2011)",
-        x = "Hour",
-        y = "Temperature"
+  ggplot(aes(x = hour, y = temp, group = date, color = season)) +
+  geom_line(alpha = 0.4) +
+  scale_color_manual(
+    values = c(
+      "winter" = "blue", "spring" = "green",
+      "summer" = "red", "fall" = "orange"
     )
+  ) +
+  labs(
+    title = "Smoothed Temperature Curves for Mumbai (2011)",
+    x = "Hour",
+    y = "Temperature"
+  )
 
 # Save the smoothed curves plot
 ggsave("assets/smoothed_temperature_curves.png", width = 10, height = 6)
@@ -236,13 +255,13 @@ cov_df$covariance <- as.vector(cov_mat)
 
 # Create a 2D heatmap of the covariance surface
 ggplot(cov_df, aes(x = hour1, y = hour2, fill = covariance)) +
-    geom_tile() +
-    scale_fill_gradientn(colors = c("blue", "white", "red"), limits = c(-3, 7)) +
-    labs(
-        title = "Covariance Heatmap",
-        x = "Hour",
-        y = "Hour"
-    )
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red"), limits = c(-3, 7)) +
+  labs(
+    title = "Covariance Heatmap",
+    x = "Hour",
+    y = "Hour"
+  )
 
 # Save the covariance heatmap
 ggsave("assets/covariance_heatmap.png", width = 7, height = 6)
@@ -258,18 +277,18 @@ acceleration_fd <- deriv.fd(fd_object, 2)
 # Plot the first derivative (slope)
 png("assets/slope_fd_plot.png", width = 800, height = 600)
 plot(slope_fd,
-    xlab = "Hour", ylab = "Slope",
-    main = "Slope of Temperature curves",
-    cex.axis = 2, cex.lab = 2, cex.main = 2
+  xlab = "Hour", ylab = "Slope",
+  main = "Slope of Temperature curves",
+  cex.axis = 2, cex.lab = 2, cex.main = 2
 )
 dev.off()
 
 # Plot the second derivative (acceleration)
 png("assets/acceleration_fd_plot.png", width = 800, height = 600)
 plot(acceleration_fd,
-    xlab = "Hour", ylab = "Acceleration",
-    main = "Acceleration of Temperature curves",
-    cex.axis = 2, cex.lab = 2, cex.main = 2
+  xlab = "Hour", ylab = "Acceleration",
+  main = "Acceleration of Temperature curves",
+  cex.axis = 2, cex.lab = 2, cex.main = 2
 )
 dev.off()
 ```
@@ -286,14 +305,14 @@ print(pca_results$varprop)
 png("assets/pca_plot.png", width = 800, height = 400)
 par(mfrow = c(1, 3))
 for (i in 1:3) {
-    plot(pca_results$harmonics[i],
-        main = paste(
-            "PC", i,
-            "(Exp Var:", round(pca_results$varprop[i] * 100, 2), "%)"
-        ),
-        xlab = "Hour", ylab = "Harmonic Function",
-        cex.axis = 2, cex.lab = 2, cex.main = 2
-    )
+  plot(pca_results$harmonics[i],
+    main = paste(
+      "PC", i,
+      "(Exp Var:", round(pca_results$varprop[i] * 100, 2), "%)"
+    ),
+    xlab = "Hour", ylab = "Harmonic Function",
+    cex.axis = 2, cex.lab = 2, cex.main = 2
+  )
 }
 par(mfrow = c(1, 1))
 dev.off()
