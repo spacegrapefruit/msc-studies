@@ -1,0 +1,663 @@
+---
+title: "EDA and Functional Data Analysis of Weather Data"
+author: "Aleksandr J. Smoliakov"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+params:
+  root_dir:
+    value: "/home/aleks/msc-studies/functional_data_analysis/notebooks"
+    description: "Root directory for the project"
+  input_dir:
+    value: "../data/input"
+    description: "Directory with raw weather CSV files"
+  output_dir:
+    value: "assets"
+    description: "Directory for plots and outputs"
+```{r setup, include=FALSE}
+params <- list(
+  root_dir = "/home/aleks/msc-studies/functional_data_analysis/notebooks",
+  input_dir = "../data/input",
+  output_dir = "assets"
+)
+
+# Global setup
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.path = file.path(params$root_dir, params$output_dir),
+  fig.width = 8,
+  fig.height = 5
+)
+
+# Define paths
+input_dir <- file.path(params$root_dir, params$input_dir)
+output_dir <- file.path(params$root_dir, params$output_dir)
+
+# Create output directory if missing
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+```
+
+## Libraries
+
+```{r libraries}
+library(fda)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(stringr)
+library(fs) # File system utilities
+library(abind)
+library(purrr)
+```
+
+## Helper Functions
+
+```{r helpers}
+# Load and combine weather data
+load_weather_data <- function(path) {
+  files <- dir_ls(path, regexp = "\\.csv$")
+  df_list <- lapply(files, function(f) {
+    city <- path_ext_remove(path_file(f)) %>% str_to_title()
+    read_csv(f, show_col_types = FALSE) %>%
+      mutate(
+        City = city
+      )
+  })
+  bind_rows(df_list)
+}
+
+# Assign season based on month
+label_season <- function(date) {
+  m <- month(date)
+  case_when(
+    m %in% c(12, 1, 2) ~ "Winter",
+    m %in% c(3, 4, 5) ~ "Spring",
+    m %in% c(6, 7, 8) ~ "Summer",
+    TRUE ~ "Fall"
+  )
+}
+
+# Define seasons for color palette
+seasons_palette <- c(
+  "Winter" = "blue", "Spring" = "green",
+  "Summer" = "red", "Fall" = "orange"
+)
+
+plot_heatmap_slope <- function(slope, title) {
+  slope_df <- data.frame(
+    day = rep(days, each = length(hours)),
+    hour = rep(hours, times = length(days)),
+    slope = as.vector(slope %>% t())
+  )
+
+  # center the color scale around 0
+  slope_range <- quantile(
+    abs(slope_df$slope),
+    0.98
+  ) * 1.2
+  slope_range <- c(-999, -slope_range, slope_range, 999)
+
+  ggplot(slope_df, aes(x = day, y = hour, fill = slope)) +
+    geom_tile() +
+    scale_fill_gradientn(
+      colors = c("blue", "blue", "white", "red", "red"),
+      limits = slope_range
+    ) +
+    labs(title = title, x = "Day of Year", y = "Hour of Day")
+}
+```
+
+## Load and Preprocess Data
+
+```{r load-preprocess}
+# Read raw data
+data_weather_raw <- load_weather_data(input_dir)
+
+# Clean and augment
+data_weather <- data_weather_raw %>%
+  select(-starts_with("uvIndex..")) %>% # Drop extra uvIndex cols
+  mutate(
+    day_of_year = yday(date_time),
+    hour_of_day = hour(date_time),
+    year        = year(date_time)
+  ) %>%
+  filter(year %in% 2011:2019) %>%
+  filter(!(month(date_time) == 2 & day(date_time) == 29)) %>%
+  # Adjust day_of_year for leap years
+  group_by(year) %>%
+  mutate(
+    day_of_year = if_else(leap_year(year) & month(date_time) > 2,
+      day_of_year - 1,
+      day_of_year
+    )
+  ) %>%
+  ungroup()
+
+# Summary
+data_weather %>% glimpse()
+```
+
+## Exploratory Data Analysis: Unsmoothed Temperature Curves
+
+```{r unsmoothed_plots}
+# Select data for Mumbai
+data_mumbai <- data_weather %>%
+  filter(City == "Bombay") %>%
+  mutate(
+    date = as_date(date_time),
+    season = label_season(date)
+  )
+
+# Plot hourly temperature curves for a sample year
+sample_year <- 2011
+p1 <- data_mumbai %>%
+  filter(year == sample_year) %>%
+  ggplot(aes(x = hour_of_day, y = tempC, group = date, color = season)) +
+  geom_line(alpha = 0.3) +
+  scale_color_manual(values = seasons_palette) +
+  labs(
+    title = paste("Hourly Temperature Curves for Mumbai (", sample_year, ")", sep = ""),
+    x = "Hour of Day",
+    y = "Temperature (°C)",
+    color = "Season"
+  )
+print(p1)
+
+# Save
+ggsave(file.path(output_dir, "unsmoothed_temp_curves_mumbai.png"), p1, width = 8, height = 5)
+```
+
+## Prepare Data for Functional Analysis
+
+```{r prepare_matrix}
+# Create a 3D array [day, hour, year]
+days <- 1:365
+hours <- 0:23
+
+# Build 365 x 24 x 9 array of temperature data
+temp_matrices <- data_mumbai %>%
+  select(year, day_of_year, hour_of_day, tempC) %>%
+  pivot_wider(
+    names_from = hour_of_day,
+    values_from = tempC,
+    names_prefix = "h"
+  ) %>%
+  arrange(year, day_of_year) %>%
+  split(~year) %>%
+  map(~ select(.x, starts_with("h")) %>% as.matrix())
+
+# Combine into an array
+Y <- abind(temp_matrices, along = 3)
+```
+
+## Basis Functions and Lambda Selection
+
+```{r basis_and_lambda}
+# for smooth.bibasis
+source(file.path(params$root_dir, "functions.R"))
+
+# Define bases
+# Annual cycle basis (period = 365 days)
+basis_day <- create.bspline.basis(
+  rangeval = c(1, 365),
+  nbasis = 12
+)
+
+# Daily cycle basis (period = 24 hours)
+basis_hour <- create.fourier.basis(
+  rangeval = c(0, 23),
+  nbasis = 11, # 5 harmonics + intercept
+  period = 24
+)
+
+# Grid values
+s_grid <- days
+t_grid <- hours
+
+# Range of smoothing parameters
+lambdas <- 10^seq(-4, 1, length.out = 10)
+gcv_vals <- numeric(length(lambdas))
+
+# TODO TEMP FIX
+defaultnames <- vector("list", 3)
+defaultnames[[1]] <- "argument s"
+defaultnames[[2]] <- "argument t"
+defaultnames[[3]] <- "function"
+
+for (i in seq_along(lambdas)) {
+  cat("Processing lambda =", lambdas[i], "\n")
+
+  fdPar_s <- fdPar(basis_day, Lfdobj = 2, lambda = lambdas[i])
+  fdPar_t <- fdPar(basis_hour, Lfdobj = 2, lambda = 1e-6) # epsilon
+  surf <- smooth.bibasis(s_grid, t_grid, Y, fdPar_s, fdPar_t)
+  gcv_vals[i] <- sum(surf$gcv)
+
+  cat("GCV error for lambda =", lambdas[i], "is", gcv_vals[i], "\n")
+}
+
+# Plot GCV vs lambda
+gcv_df <- tibble(lambda = lambdas, GCV = gcv_vals)
+lambda_opt <- lambdas[which.min(gcv_vals)]
+
+p2 <- ggplot(gcv_df, aes(lambda, GCV)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10() +
+  geom_vline(
+    xintercept = lambda_opt,
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "GCV vs. Smoothing Parameter (λ)",
+    x = expression(lambda),
+    y = "GCV Error"
+  )
+print(p2)
+
+ggsave(file.path(output_dir, "gcv_vs_lambda.png"), p2, width = 8, height = 5)
+```
+
+## Bivariate Smoothing and Visualization
+
+```{r smoothing_and_plot}
+# Smooth with optimal lambda
+fdPar_s_opt <- fdPar(basis_day, Lfdobj = 2, lambda = lambda_opt)
+fdPar_t_opt <- fdPar(basis_hour, Lfdobj = 2, lambda = 1e-6) # epsilon
+
+# Smooth over the rectangular day x hour lattice
+res <- smooth.bibasis(s_grid, t_grid, Y, fdPar_s_opt, fdPar_t_opt)
+
+bifd_obj <- res$bifdobj
+
+# Evaluate on fine grid
+t_fine <- seq(0, 23, length.out = 101)
+Y_smoothed <- eval.bifd(s_grid, t_grid, bifd_obj)
+Y_smoothed_fine <- eval.bifd(s_grid, t_fine, bifd_obj)
+
+# TODO: temp code snippet
+# Plot the smoothed values for a specific year
+plot(
+  Y_smoothed[150:170, , 3] %>% t() %>% as.vector(),
+  xlab = "Day of Year",
+  ylab = "Temperature (°C)",
+  main = sprintf("Fourier-Smoothed Yearly Curves (λ = %.2e)", lambda_opt),
+  type = "l"
+)
+points(
+  Y[150:170, , 3] %>% t() %>% as.vector(),
+  col = "red", pch = 10, cex = 0.5
+)
+
+# mean(abs(Y_smoothed - Y))
+
+png(file.path(output_dir, "smoothed_temp_curve_day.png"), width = 800, height = 600)
+day_id <- 150
+year_id <- 1
+plot(
+  Y_smoothed[day_id, , year_id],
+  ylim = c(25, 35),
+  xlab = "Hour of Day",
+  ylab = "Temperature (°C)",
+  main = "Smoothed Temperature Curve for Year 2011, Day 150"
+)
+points(Y[day_id, , year_id], col = "red", pch = 20)
+
+dev.off()
+
+png(file.path(output_dir, "smoothed_temp_curve_year.png"), width = 800, height = 600)
+hour_id <- 5
+year_id <- 1
+plot(
+  Y_smoothed[, hour_id, year_id],
+  ylim = c(15, 30),
+  xlab = "Day of Year",
+  ylab = "Temperature (°C)",
+  main = "Smoothed Temperature Curve for Year 2011, Hour 4"
+)
+points(Y[, hour_id, year_id], col = "red", pch = 20)
+
+dev.off()
+# TODO: temp code snippet END
+
+# Convert to long format for ggplot
+smoothed_df <- as_tibble(Y_smoothed_fine[, , 1]) %>%
+  mutate(day = days) %>%
+  pivot_longer(-day, names_to = "hour_idx", values_to = "temp") %>%
+  mutate(
+    hour = as.numeric(str_remove(hour_idx, "^V")) - 1,
+    date = as_date(day - 1, origin = paste0(sample_year - 1, "-12-31")),
+    season = label_season(date)
+  )
+
+p3 <- smoothed_df %>%
+  ggplot(aes(x = hour, y = temp, group = date, color = season)) +
+  geom_line(alpha = 0.3) +
+  scale_color_manual(values = seasons_palette) +
+  labs(
+    title = paste("Smoothed Temperature Curves for Mumbai (", sample_year, ")", sep = ""),
+    x = "Hour of Day",
+    y = "Temperature (°C)",
+    color = "Season"
+  )
+print(p3)
+
+ggsave(file.path(output_dir, "smoothed_temp_curves_mumbai.png"), p3, width = 8, height = 5)
+```
+
+## Derivatives Heatmaps
+
+```{r derivatives_heatmaps}
+# Derivatives w.r.t. day
+slope_day <- eval.bifd(s_grid, t_grid, bifd_obj, sLfdobj = 1, tLfdobj = 0)
+accel_day <- eval.bifd(s_grid, t_grid, bifd_obj, sLfdobj = 2, tLfdobj = 0)
+
+# Derivatives w.r.t. hour
+slope_hour <- eval.bifd(s_grid, t_grid, bifd_obj, sLfdobj = 0, tLfdobj = 1)
+accel_hour <- eval.bifd(s_grid, t_grid, bifd_obj, sLfdobj = 0, tLfdobj = 2)
+
+p4 <- plot_heatmap_slope(slope_day[, , 1], "First Derivative (Days)")
+print(p4)
+ggsave(file.path(output_dir, "derivative_day1.png"), p4, width = 8, height = 5)
+
+p5 <- plot_heatmap_slope(accel_day[, , 1], "Second Derivative (Days)")
+print(p5)
+ggsave(file.path(output_dir, "derivative_day2.png"), p5, width = 8, height = 5)
+
+p6 <- plot_heatmap_slope(slope_hour[, , 1], "First Derivative (Hours)")
+print(p6)
+ggsave(file.path(output_dir, "derivative_hour1.png"), p6, width = 8, height = 5)
+
+p7 <- plot_heatmap_slope(accel_hour[, , 1], "Second Derivative (Hours)")
+print(p7)
+ggsave(file.path(output_dir, "derivative_hour2.png"), p7, width = 8, height = 5)
+```
+
+## Covariance Analysis and Heatmap
+
+```{r covariance-heatmap}
+# average the coefficients over replicates
+mean_coef <- apply(bifd_obj$coefs, c(1, 2), mean)
+
+# rebuild a single-surface bifd object
+mean_surface <- bifd(
+  coef = mean_coef,
+  sbasisobj = bifd_obj$sbasis,
+  tbasisobj = bifd_obj$tbasis,
+  fdnames = list(
+    s = bifd_obj$bifdnames[[1]],
+    t = bifd_obj$bifdnames[[2]],
+    rep = NULL,
+    var = "Mean Surface"
+  )
+)
+
+
+
+year_idx <- 1
+daily_mat <- t(Y_smoothed[, , year_idx])
+
+daily_fd <- Data2fd(
+  argvals   = hours, # 0:23
+  y         = daily_mat, # matrix 24×365
+  basisobj  = basis_hour # your Fourier basis over 0–23
+)
+
+cov_bifd <- var.fd(daily_fd)
+cov_mat <- eval.bifd(t_fine, t_fine, cov_bifd)
+
+cov_df <- expand.grid(
+  hour1 = t_fine,
+  hour2 = t_fine
+) %>%
+  mutate(covariance = as.vector(cov_mat))
+
+p_cov <- ggplot(cov_df, aes(x = hour1, y = hour2, fill = covariance)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+  labs(
+    title = "Covariance of Hourly Temperatures (Days as Replicates)",
+    x     = "Hour of Day",
+    y     = "Hour of Day",
+    fill  = "Covariance"
+  ) +
+  theme_minimal()
+
+print(p_cov)
+ggsave(file.path(output_dir, "covariance_heatmap.png"), p_cov, width = 7, height = 6)
+```
+
+## Functional Principal Component Analysis
+
+```{r fpca_analysis}
+# Perform FPCA on bivariate functional data
+# Flatten coefficients
+coef_arr <- bifd_obj$coefs
+nb_s <- basis_day$nbasis
+nb_t <- basis_hour$nbasis
+nrep <- dim(coef_arr)[3]
+coef_mat <- matrix(nrow = nrep, ncol = nb_s * nb_t)
+for (i in seq_len(nrep)) {
+  coef_mat[i, ] <- as.vector(coef_arr[, , i])
+}
+
+pca_res <- prcomp(coef_mat, center = TRUE)
+loadings <- pca_res$rotation # (nb_s*nb_t) × ncomp
+
+# helper to build a bifd from a single loading vector
+make_pc_surf <- function(pc_idx) {
+  matcoef <- matrix(loadings[, pc_idx], nrow = nb_s, ncol = nb_t)
+  bifd(
+    coef = matcoef,
+    sbasisobj = basis_day,
+    tbasisobj = basis_hour,
+    fdnames = list(s = "s", t = "t", rep = NULL, var = paste0("PC", pc_idx))
+  )
+}
+
+pc1_bifd <- make_pc_surf(1) # principal surface #1
+pc2_bifd <- make_pc_surf(2) # principal surface #2
+pc3_bifd <- make_pc_surf(3) # principal surface #3
+
+# evaluate on grid
+PC1vals <- eval.bifd(s_grid, t_grid, pc1_bifd)
+PC2vals <- eval.bifd(s_grid, t_grid, pc2_bifd)
+PC3vals <- eval.bifd(s_grid, t_grid, pc3_bifd)
+
+# heatmap of PC1
+PC1_df <- data.frame(
+  day = rep(t_grid, each = length(s_grid)),
+  hour = rep(s_grid, times = length(t_grid)),
+  PC1 = as.vector(PC1vals)
+)
+PC2_df <- data.frame(
+  day = rep(t_grid, each = length(s_grid)),
+  hour = rep(s_grid, times = length(t_grid)),
+  PC2 = as.vector(PC2vals)
+)
+PC3_df <- data.frame(
+  day = rep(t_grid, each = length(s_grid)),
+  hour = rep(s_grid, times = length(t_grid)),
+  PC3 = as.vector(PC3vals)
+)
+
+var_explained1 <- pca_res$sdev[1]^2 / sum(pca_res$sdev^2)
+p8 <- ggplot(PC1_df, aes(x = hour, y = day, fill = PC1)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(
+    title = sprintf("PC1 (Variance Explained: %.2f%%)", var_explained1 * 100),
+    x = "Day of Year",
+    y = "Hour of Day"
+  )
+print(p8)
+
+ggsave(file.path(output_dir, "pc1_heatmap.png"), p8, width = 9, height = 6)
+
+var_explained2 <- pca_res$sdev[2]^2 / sum(pca_res$sdev^2)
+p9 <- ggplot(PC2_df, aes(x = hour, y = day, fill = PC2)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(
+    title = sprintf("PC2 (Variance Explained: %.2f%%)", var_explained2 * 100),
+    x = "Day of Year",
+    y = "Hour of Day"
+  )
+print(p9)
+
+ggsave(file.path(output_dir, "pc2_heatmap.png"), p9, width = 9, height = 6)
+
+var_explained3 <- pca_res$sdev[3]^2 / sum(pca_res$sdev^2)
+p10 <- ggplot(PC3_df, aes(x = hour, y = day, fill = PC3)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(
+    title = sprintf("PC3 (Variance Explained: %.2f%%)", var_explained3 * 100),
+    x = "Day of Year",
+    y = "Hour of Day"
+  )
+print(p10)
+
+ggsave(file.path(output_dir, "pc3_heatmap.png"), p10, width = 9, height = 6)
+```
+
+## Curve Registration
+
+To align daily temperature curves across years and remove phase variation, we perform landmark registration on the smoothed functional data.
+
+```{r registration}
+# Assume daily_fd is a functional data object of daily curves for a given year
+# Compute mean function
+mean_fd <- mean.fd(daily_fd)
+# Landmark registration based on maximum temperature time
+# Identify landmarks: hour of daily maximum
+landmarks <- apply(eval.fd(hours, daily_fd), 2, which.max)
+# Convert to continuous landmark times
+lm_times <- hours[landmarks]
+# Perform registration relative to the mean landmark
+reg_res <- landmarkreg(daily_fd, mean_fd, outin = FALSE)
+registered_fd <- reg_res
+eval_registered <- eval.fd(hours, registered_fd)
+
+# Plot before vs after registration for a sample day
+par(mfrow = c(1, 2))
+plot(eval.fd(hours, daily_fd)[, 1], type = "l", xlab = "Hour", ylab = "Temp", main = "Original Curve")
+lines(eval.fd(hours, daily_fd)[, 2], col = "grey")
+plot(eval.fd(hours, registered_fd)[, 1], type = "l", xlab = "Hour", ylab = "Temp", main = "Registered Curve")
+lines(eval.fd(hours, registered_fd)[, 2], col = "grey")
+```
+
+## Functional ANOVA by Season
+
+Test for differences in mean daily temperature functions across seasons.
+
+```{r fANOVA}
+library(fdANOVA)
+# Use smoothed functional observations for each season
+season_list <- split(registered_fd, label_season(as.Date(days - 1, origin = "2010-12-31")))
+# Perform one-way functional ANOVA
+anova_res <- fanova.onefactor(season_list)
+print(anova_res)
+plot(anova_res)
+```
+
+## Functional Depth and Outlier Detection
+
+Identify outlying temperature curves using band depth and visualize with a functional boxplot.
+
+```{r depth_outliers}
+library(fda)
+library(fdaoutlier)
+# Compute band depth
+bd <- fbplot(eval.fd(hours, daily_fd), plot = FALSE)
+# Plot functional boxplot
+fbplot(eval.fd(hours, daily_fd), main = "Functional Boxplot of Daily Curves")
+# Outliers
+outliers <- bd$outs
+print(outliers)
+```
+
+## Functional Time-Series Modeling and Forecasting
+
+Fit a functional autoregressive model to the sequence of annual smoothed surfaces and forecast the next year.
+
+```{r far_model}
+library(ftsa)
+library(vars)
+
+# Represent each year as vector of FPCA scores (first K components)
+scores <- pca_res$x[, 1:3]
+# Fit VAR on scores
+var_fit <- VAR(scores, p = 1)
+# Forecast next-year scores
+fc_scores <- predict(var_fit, n.ahead = 1)$fcst
+# Reconstruct forecast surface
+pc_surfaces <- list(pc1_bifd, pc2_bifd, pc3_bifd)
+coef_forecast <- sapply(1:3, function(i) fc_scores[[i]][, "fcst"])
+coef_mat_fc <- Reduce(
+  `+`, Map(function(coef, pc) pc$coefs * coef, coef_forecast, pc_surfaces)
+)
+fc_bifd <- bifd(
+  coef = coef_mat_fc,
+  sbasisobj = basis_day,
+  tbasisobj = basis_hour
+)
+# Evaluate and plot forecast mean curve
+fc_surface <- eval.bifd(s_grid, t_grid, fc_bifd)
+fc_df <- data.frame(
+  day = rep(t_grid, each = length(s_grid)),
+  hour = rep(s_grid, times = length(t_grid)),
+  forecast = as.vector(fc_surface)
+)
+p_fc <- ggplot(fc_df, aes(x = hour, y = day, fill = forecast)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(
+    title = "Forecasted Temperature Surface",
+    x = "Day of Year",
+    y = "Hour of Day"
+  )
+print(p_fc)
+
+
+mean_coef_vec <- pca_res$center
+mean_mat <- matrix(mean_coef_vec, nrow = nb_s, ncol = nb_t)
+
+coef_mat_fc_full <- mean_mat + coef_mat_fc
+
+fc_bifd_full <- bifd(
+  coef = coef_mat_fc_full,
+  sbasisobj = basis_day,
+  tbasisobj = basis_hour
+)
+fc_surface_full <- eval.bifd(s_grid, t_grid, fc_bifd_full)
+fc_df_full <- data.frame(
+  day = rep(t_grid, each = length(s_grid)),
+  hour = rep(s_grid, times = length(t_grid)),
+  forecast = as.vector(fc_surface_full)
+)
+
+p_fc_full <- ggplot(fc_df_full, aes(x = hour, y = day, fill = forecast)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red")) +
+  labs(
+    title = "Forecasted Temperature Surface (Full)",
+    x = "Day of Year",
+    y = "Hour of Day"
+  )
+print(p_fc_full)
+
+ggsave(file.path(output_dir, "forecast_surface_full.png"), p_fc_full, width = 9, height = 6)
+```
+
+# ## Next Steps
+
+# - Explore monotonic smoothing for cumulative temperature indices
+# - Implement kernel smoothing (Nadaraya–Watson) for nonparametric curve estimation
+# - Apply FaST-LMM for classification of days into clusters by temperature profile
+# - Investigate change-point detection for seasonal transitions
