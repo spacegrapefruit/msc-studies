@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "assignment2"
+version = "0.1.0"
+description = "TODO"
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.lt>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10, <3.12"
+ipykernel = "6.29.5"
+ruff = "^0.11.4"
+langchain = "^0.3.24"
+langchain-community = "^0.3.23"
+langchain-chroma = "^0.2.3"
+chromadb = "^0.6.3"
+gpt4all = {version="^2.8.2", extras=[]}
+langgraph = "^0.4.1"
+wikipedia = "^1.4.0"
+pandas = "^2.2.3"
+pyarrow = "^20.0.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
