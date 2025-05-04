@@ -29,8 +29,8 @@ This directory contains a set of Jupyter notebooks that together implement a com
 │
 ├── notebooks/
 │   ├── download_content.ipynb              # Step 1: Fetch Wikipedia articles
-│   ├── index_documents.ipynb               # Step 2: Chunk, embed, and index
-│   └── rag_pipeline.ipynb                  # Step 3: Define & test RAG pipeline
+│   ├── index_documents.ipynb               # Steps 2-3: Chunk, embed, and index
+│   └── rag_pipeline.ipynb                  # Steps 4-5: Define & test RAG pipeline
 │
 ├── poetry.lock                             # Poetry lock file
 ├── pyproject.toml                          # Poetry dependencies
