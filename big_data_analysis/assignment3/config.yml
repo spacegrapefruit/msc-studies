@@ -1,0 +1,15 @@
+mongo: &mongo_defaults
+  mongo_uri: "mongodb://localhost:27020"
+  db_name: "aisdk"
+  raw_collection: "raw"
+  clean_collection: "clean"
+
+ingest:
+  <<: *mongo_defaults
+  num_workers: 4
+  input_file: "data/input/aisdk-2025-05-01.csv"
+  batch_size: 1000
+
+filter_noise:
+  <<: *mongo_defaults
+  num_workers: 4
