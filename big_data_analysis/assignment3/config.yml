@@ -8,7 +8,7 @@ ingest:
   <<: *mongo_defaults
   num_workers: 4
   input_file: "data/input/aisdk-2025-05-01.csv"
-  max_rows: 1000000
+  max_rows: 600000
   batch_size: 50000
 
 filter_noise:

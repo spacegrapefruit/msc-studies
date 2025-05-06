@@ -10,7 +10,7 @@ from config import Config
 
 
 REQUIRED_FIELDS = [
-    "NavigationalStatus",
+    "Navigational status",
     "MMSI",
     "Latitude",
     "Longitude",
@@ -26,7 +26,7 @@ def worker(q: Queue, worker_id: int, config: Config):
     """
     Worker function to process batches of data and insert them into MongoDB.
     """
-    client = MongoClient(config.mongo_uri, connectTimeoutMS=1000, socketTimeoutMS=1000)
+    client = MongoClient(config.mongo_uri)
     logging.info(f"Worker {worker_id} connected to MongoDB")
 
     raw_coll = client[config.db_name][config.raw_collection]

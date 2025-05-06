@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from pymongo import MongoClient, ASCENDING
+from tqdm import tqdm
 
 from config import Config
 
@@ -23,18 +24,21 @@ if __name__ == "__main__":
 
     # connect to MongoDB
     client = MongoClient(config.mongo_uri)
+    logging.info("Connected to MongoDB")
+
     clean_coll = client[config.db_name][config.clean_collection]
 
     # ensure sorted by time
     cursor = clean_coll.find({}, {"MMSI": 1, "Timestamp": 1}).sort(
         [("MMSI", ASCENDING), ("Timestamp", ASCENDING)]
     )
+    logging.info("Connected to MongoDB and sorted collection")
 
     prev = {}
     deltas = []
-    for doc in cursor:
+    for doc in tqdm(cursor):
         m = doc["MMSI"]
-        t = pd.to_datetime(doc["Timestamp"])
+        t = pd.Timestamp(doc["Timestamp"])
         if m in prev:
             deltas.append((t - prev[m]).total_seconds() * 1000)
         prev[m] = t

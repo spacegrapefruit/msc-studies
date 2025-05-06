@@ -56,6 +56,7 @@ if __name__ == "__main__":
             config.input_file, chunksize=config.batch_size, nrows=config.max_rows
         ),
     ):
+        chunk_df = chunk_df.rename(columns={"# Timestamp": "Timestamp"})
         batch = chunk_df.to_dict(orient="records")
         q.put(batch)
 
