@@ -16,7 +16,7 @@ def worker(q: Queue, worker_id: int, config: Config):
     """
     logging.info(f"Worker {worker_id} starting")
 
-    client = MongoClient(config.mongo_uri, connectTimeoutMS=1000, socketTimeoutMS=1000)
+    client = MongoClient(config.mongo_uri)
     logging.info(f"Worker {worker_id} connected to MongoDB")
 
     raw_coll = client[config.db_name][config.raw_collection]

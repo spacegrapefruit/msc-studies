@@ -7,8 +7,6 @@ from pymongo import MongoClient, ASCENDING
 
 from config import Config
 
-OUTPUT_IMG = "delta_t_histogram.png"
-
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -18,8 +16,12 @@ if __name__ == "__main__":
 
     # load configuration
     config_path = Path(__file__).parent.parent / "config.yml"
-    config = Config(config_path, "calculate_delta_histogram")
+    config = Config(config_path, "calculate_statistics")
+    output_dir = Path(__file__).parent.parent / config.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logging.info(f"Output directory: {output_dir}")
 
+    # connect to MongoDB
     client = MongoClient(config.mongo_uri)
     clean_coll = client[config.db_name][config.clean_collection]
 
@@ -40,12 +42,15 @@ if __name__ == "__main__":
     client.close()
 
     df = pd.DataFrame({"delta_t_ms": deltas})
-    df.to_csv("delta_t_values.csv", index=False)
+    csv_path = output_dir / "delta_t_values.csv"
+    df.to_csv(csv_path, index=False)
+    logging.info(f"Saved delta t values to {csv_path}")
 
     plt.figure()
     plt.hist(df["delta_t_ms"], bins=100)
     plt.xlabel("Delta t (ms)")
     plt.ylabel("Frequency")
     plt.title("Histogram of Inter-message Intervals")
-    plt.savefig(OUTPUT_IMG)
-    print(f"Saved histogram to {OUTPUT_IMG}")
+    img_path = output_dir / "delta_t_histogram.png"
+    plt.savefig(img_path)
+    logging.info(f"Saved histogram to {img_path}")

@@ -8,8 +8,12 @@ ingest:
   <<: *mongo_defaults
   num_workers: 4
   input_file: "data/input/aisdk-2025-05-01.csv"
-  batch_size: 1000
+  batch_size: 100000
 
 filter_noise:
   <<: *mongo_defaults
   num_workers: 4
+
+calculate_statistics:
+  <<: *mongo_defaults
+  output_dir: "data/output"

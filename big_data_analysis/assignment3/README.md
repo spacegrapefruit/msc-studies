@@ -1,0 +1,87 @@
+# AISDK Data Noise Filtering and Analysis
+
+## Requirements
+- Docker & Docker Compose
+- Mongo Shell (`mongodb-mongosh`)
+- Python 3.10 or 3.11
+- Poetry or pip (for Python package management)
+
+## Setup
+1. Bring up Mongo sharded cluster:
+   ```bash
+   docker compose up -d
+   ```
+
+2. Initialize replica sets & sharding:
+
+   Connect to config server (`mongosh --port 27019`):
+
+   ```js
+   // config servers
+   rs.initiate({ _id: "cfgrs", configsvr: true, members: [ { _id:0, host:"configsvr:27019" } ] });
+   ```
+   Connect to shard servers (`mongosh --port 27018`):
+
+   ```js
+   // shard1 servers
+   rs.initiate({ _id: "shard1", members: [ { _id:0, host:"shard1a:27018" }, { _id:1, host:"shard1b:27017" } ] });
+   ```
+   Connect to shard servers (`mongosh --port 27016`):
+
+   ```js
+   // shard2 servers
+   rs.initiate({ _id: "shard2", members: [ { _id:0, host:"shard2a:27016" }, { _id:1, host:"shard2b:27015" } ] });
+   ```
+   Connect to the mongos router (`mongosh --port 27020`):
+
+   ```js
+   // mongos router
+   sh.addShard("shard1/shard1a:27018,shard1b:27017");
+   sh.addShard("shard2/shard2a:27016,shard2b:27015");
+
+   // enable sharding for DB
+   sh.enableSharding("aisdk");
+
+   // enable sharding for collections
+   sh.shardCollection("aisdk.raw", {MMSI:1});
+   sh.shardCollection("aisdk.clean", {MMSI:1});
+   ```
+
+## Running the pipeline
+
+1. Install Python dependencies:
+
+   If using Poetry:
+
+   ```bash
+   poetry install -v
+   ```
+
+   If using pip:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Ingest data in parallel:
+   ```bash
+   [poetry run] python python/ingest.py
+   ```
+
+3. Filter noise in parallel:
+   ```bash
+   [poetry run] python python/filter_noise.py
+   ```
+
+4. Calculate Δt and generate histogram:
+   ```bash
+   [poetry run] python python/calculate_statistics.py
+   ```
+
+## Clean up
+
+1. Stop and remove Docker containers:
+   ```bash
+   docker compose down --volumes
+   ```
+
+<!-- TODO: Record a short video showing one Mongo instance failure (e.g., `docker kill shard1b`) and the cluster continuing to serve reads/writes. -->

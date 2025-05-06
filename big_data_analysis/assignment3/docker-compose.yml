@@ -1,0 +1,59 @@
+services:
+  configsvr:
+    image: mongo:7.0
+    command: mongod --configsvr --replSet cfgrs --bind_ip_all --port 27019
+    ports:
+      - 27019:27019
+    volumes:
+      - configdb:/data/db
+
+  shard1a:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard1 --bind_ip_all --port 27018
+    ports:
+      - 27018:27018
+    volumes:
+      - shard1a:/data/db
+
+  shard1b:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard1 --bind_ip_all --port 27017
+    ports:
+      - 27017:27017
+    volumes:
+      - shard1b:/data/db
+
+  shard2a:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27016
+    ports:
+      - 27016:27016
+    volumes:
+      - shard2a:/data/db
+
+  shard2b:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27015
+    ports:
+      - 27015:27015
+    volumes:
+      - shard2b:/data/db
+
+  mongos:
+    image: mongo:7.0
+    command: mongos --configdb cfgrs/configsvr:27019 --bind_ip_all --port 27020
+    ports:
+      - 27020:27020
+    depends_on:
+      - configsvr
+      - shard1a
+      - shard1b
+      - shard2a
+      - shard2b
+
+volumes:
+  configdb:
+  shard1a:
+  shard1b:
+  shard2a:
+  shard2b:
