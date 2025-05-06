@@ -51,11 +51,13 @@ if __name__ == "__main__":
         t.start()
         threads.append(t)
 
-        for chunk_df in tqdm(
-            pd.read_csv(config.input_file, chunksize=config.batch_size)
-        ):
-            batch = chunk_df.to_dict(orient="records")
-            q.put(batch)
+    for chunk_df in tqdm(
+        pd.read_csv(
+            config.input_file, chunksize=config.batch_size, nrows=config.max_rows
+        ),
+    ):
+        batch = chunk_df.to_dict(orient="records")
+        q.put(batch)
 
     # stop workers
     for _ in threads:
