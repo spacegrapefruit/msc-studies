@@ -20,24 +20,24 @@
    // config servers
    rs.initiate({ _id: "cfgrs", configsvr: true, members: [ { _id:0, host:"configsvr:27019" } ] });
    ```
-   Connect to shard servers (`mongosh --port 27018`):
+   Connect to shard1 servers (`mongosh --port 27018`):
 
    ```js
    // shard1 servers
-   rs.initiate({ _id: "shard1", members: [ { _id:0, host:"shard1a:27018" }, { _id:1, host:"shard1b:27017" } ] });
+   rs.initiate({ _id: "shard1", members: [ { _id:0, host:"shard1a:27018" }, { _id:1, host:"shard1b:27017" }, { _id:2, host:"shard1c:27016" } ] });
    ```
-   Connect to shard servers (`mongosh --port 27016`):
+   Connect to shard2 servers (`mongosh --port 27016`):
 
    ```js
    // shard2 servers
-   rs.initiate({ _id: "shard2", members: [ { _id:0, host:"shard2a:27016" }, { _id:1, host:"shard2b:27015" } ] });
+   rs.initiate({ _id: "shard2", members: [ { _id:0, host:"shard2a:27015" }, { _id:1, host:"shard2b:27014" }, { _id:2, host:"shard2c:27013" } ] });
    ```
    Connect to the mongos router (`mongosh --port 27020`):
 
    ```js
    // mongos router
-   sh.addShard("shard1/shard1a:27018,shard1b:27017");
-   sh.addShard("shard2/shard2a:27016,shard2b:27015");
+   sh.addShard("shard1/shard1a:27018,shard1b:27017,shard1c:27016");
+   sh.addShard("shard2/shard2a:27015,shard2b:27014,shard2c:27013");
 
    // enable sharding for DB
    sh.enableSharding("aisdk");
@@ -54,7 +54,7 @@
    If using Poetry:
 
    ```bash
-   poetry install -v
+   poetry install --no-root -v
    ```
 
    If using pip:
@@ -83,5 +83,3 @@
    ```bash
    docker compose down --volumes
    ```
-
-<!-- TODO: Record a short video showing one Mongo instance failure (e.g., `docker kill shard1b`) and the cluster continuing to serve reads/writes. -->

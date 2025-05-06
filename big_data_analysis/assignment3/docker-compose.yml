@@ -7,6 +7,7 @@ services:
     volumes:
       - configdb:/data/db
 
+  # shard1
   shard1a:
     image: mongo:7.0
     command: mongod --shardsvr --replSet shard1 --bind_ip_all --port 27018
@@ -23,21 +24,38 @@ services:
     volumes:
       - shard1b:/data/db
 
-  shard2a:
+  shard1c:
     image: mongo:7.0
-    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27016
+    command: mongod --shardsvr --replSet shard1 --bind_ip_all --port 27016
     ports:
       - 27016:27016
     volumes:
-      - shard2a:/data/db
+      - shard1c:/data/db
 
-  shard2b:
+  # shard2
+  shard2a:
     image: mongo:7.0
     command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27015
     ports:
       - 27015:27015
     volumes:
+      - shard2a:/data/db
+
+  shard2b:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27014
+    ports:
+      - 27014:27014
+    volumes:
       - shard2b:/data/db
+
+  shard2c:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27013
+    ports:
+      - 27013:27013
+    volumes:
+      - shard2c:/data/db
 
   mongos:
     image: mongo:7.0
@@ -48,12 +66,16 @@ services:
       - configsvr
       - shard1a
       - shard1b
+      - shard1c
       - shard2a
       - shard2b
+      - shard2c
 
 volumes:
   configdb:
   shard1a:
   shard1b:
+  shard1c:
   shard2a:
   shard2b:
+  shard2c:
