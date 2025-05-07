@@ -1,4 +1,4 @@
-.PHONY: all up init-config init-shard1 init-shard2 add-shards install-poetry install-pip ingest filter stats clean
+.PHONY: all up init-config init-shard1 init-shard2 add-shards install-poetry install-pip ingest filter stats clean format
 
 all: up init-config init-shard1 init-shard2 add-shards install-poetry ingest filter stats
 
@@ -50,3 +50,6 @@ stats:
 # Tear down the cluster and remove volumes
 clean:
 	docker compose down --volumes
+
+format:
+	poetry run ruff format .

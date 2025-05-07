@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -7,6 +8,40 @@ from pymongo import MongoClient, ASCENDING
 from tqdm import tqdm
 
 from config import Config
+
+delta_t_pipeline = [
+    # add prevTs = timestamp of the previous doc in the same MMSI
+    {
+        "$setWindowFields": {
+            "partitionBy": "$MMSI",
+            "sortBy": {"Timestamp": 1},
+            "output": {
+                "prevTs": {
+                    "$shift": {
+                        "output": "$Timestamp",
+                        "by": -1,  # shift backwards by 1
+                        "default": None,
+                    }
+                }
+            },
+        }
+    },
+    # compute the delta, in ms
+    {
+        "$addFields": {
+            "delta_t_ms": {
+                "$multiply": [
+                    {"$subtract": ["$Timestamp", "$prevTs"]},
+                    1,  # already in ms
+                ]
+            }
+        }
+    },
+    # drop the first row per MMSI
+    {"$match": {"prevTs": {"$ne": None}}},
+    # project only the delta
+    {"$project": {"_id": 0, "delta_t_ms": 1}},
+]
 
 
 if __name__ == "__main__":
@@ -28,20 +63,10 @@ if __name__ == "__main__":
 
     clean_coll = client[config.db_name][config.clean_collection]
 
-    # ensure sorted by time
-    cursor = clean_coll.find({}, {"MMSI": 1, "Timestamp": 1}).sort(
-        [("MMSI", ASCENDING), ("Timestamp", ASCENDING)]
-    )
-    logging.info("Connected to MongoDB and sorted collection")
-
-    prev = {}
-    deltas = []
-    for doc in tqdm(cursor):
-        m = doc["MMSI"]
-        t = pd.Timestamp(doc["Timestamp"])
-        if m in prev:
-            deltas.append((t - prev[m]).total_seconds() * 1000)
-        prev[m] = t
+    # run the aggregation and pull back a flat list of numbers
+    cursor = clean_coll.aggregate(delta_t_pipeline)
+    deltas = [doc["delta_t_ms"] for doc in tqdm(cursor)]
+    logging.info(f"Retrieved {len(deltas)} delta t values")
 
     client.close()
 
@@ -50,11 +75,19 @@ if __name__ == "__main__":
     df.to_csv(csv_path, index=False)
     logging.info(f"Saved delta t values to {csv_path}")
 
+    data = df["delta_t_ms"][df["delta_t_ms"] > 0]
+
+    # make bins spaced evenly in log-space between lowest and highest values
+    min_val, max_val = data.min(), data.max()
+    bins = np.logspace(np.log10(min_val), np.log10(max_val), 100)
+
     plt.figure()
-    plt.hist(df["delta_t_ms"], bins=100)
+    plt.hist(data, bins=bins, log=True)
+    plt.xscale("log")
     plt.xlabel("Delta t (ms)")
     plt.ylabel("Frequency")
     plt.title("Histogram of Inter-message Intervals")
+
     img_path = output_dir / "delta_t_histogram.png"
     plt.savefig(img_path)
     logging.info(f"Saved histogram to {img_path}")

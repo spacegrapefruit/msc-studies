@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     # index for fast grouping
     raw_coll.create_index([("MMSI", ASCENDING)])
-    clean_coll.create_index([("MMSI", ASCENDING)])
+    clean_coll.create_index([("MMSI", ASCENDING), ("Timestamp", ASCENDING)])
 
     # enqueue distinct vessels
     q = Queue(maxsize=config.num_workers * 2)

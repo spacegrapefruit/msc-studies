@@ -57,6 +57,10 @@ if __name__ == "__main__":
         ),
     ):
         chunk_df = chunk_df.rename(columns={"# Timestamp": "Timestamp"})
+        chunk_df["Timestamp"] = pd.to_datetime(
+            chunk_df["Timestamp"],
+            format="%d/%m/%Y %H:%M:%S",
+        )
         batch = chunk_df.to_dict(orient="records")
         q.put(batch)
 
