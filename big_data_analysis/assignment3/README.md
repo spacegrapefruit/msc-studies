@@ -6,6 +6,13 @@
 - Python 3.10 or 3.11
 - Poetry or pip (for Python package management)
 
+## Running the pipeline using Makefile
+
+While the setup, pipeline, and clean up stages can be run manually by following the instructions below, a Makefile is provided to simplify the process. The Makefile contains targets for each step of the process, allowing you to run them with a single command:
+   ```bash
+   make
+   ```
+
 ## Setup
 1. Bring up Mongo sharded cluster:
    ```bash
