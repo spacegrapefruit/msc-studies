@@ -23,7 +23,7 @@ The objective of this assignment is to filter out noise from a given dataset usi
 **Task 4:** Calculation of Delta t and Histogram Generation
 * [x] Calculate the time difference (delta t) in milliseconds between two subsequent data points for each filtered vessel.
 * [x] Generate a histogram based on the calculated delta t values.
-* [ ] Analyze the histogram to gain insights into vessel behavior.
+* [x] Analyze the histogram to gain insights into vessel behavior.
 
 **Task 5:** Presentation of the Solution
 * [ ] Record a short video showing one Mongo instance failure (e.g., `docker kill shard1b`) and the cluster continuing to serve reads/writes.
