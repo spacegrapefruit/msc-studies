@@ -26,5 +26,5 @@ The objective of this assignment is to filter out noise from a given dataset usi
 * [x] Analyze the histogram to gain insights into vessel behavior.
 
 **Task 5:** Presentation of the Solution
-* [ ] Record a short video showing one Mongo instance failure (e.g., `docker kill shard1b`) and the cluster continuing to serve reads/writes.
-* [ ] Upload the code and solution to the "Big data analysis" section of https://emokymai.vu.lt/.
+* [x] Record a short video showing one Mongo instance failure (e.g., `docker kill shard1b`) and the cluster continuing to serve reads/writes.
+* [x] Upload the code and solution to the "Big data analysis" section of https://emokymai.vu.lt/.

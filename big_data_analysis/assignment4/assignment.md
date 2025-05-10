@@ -9,12 +9,12 @@ The provided dataset contains Automatic Identification System (AIS) data for ves
 ## Tasks
 
 * [x] Download the dataset from the given URL and unzip it to access the .csv or similar format file contained within.
-* [ ] Load the data into a PySpark DataFrame.
-* [ ] Ensure that the data types for latitude, longitude, and timestamp are appropriate for calculations and sorting.
-* [ ] Calculate the distance between consecutive positions for each vessel using a suitable geospatial library or custom function that can integrate
-* [ ] Aggregate these distances by MMSI to get the total distance traveled by each vessel on that day.
-* [ ] Sort or use an aggregation function to determine which vessel traveled the longest distance.
-* [ ] The final output should be the MMSI of the vessel that traveled the longest distance, along with the computed distance.
+* [x] Load the data into a PySpark DataFrame.
+* [x] Ensure that the data types for latitude, longitude, and timestamp are appropriate for calculations and sorting.
+* [x] Calculate the distance between consecutive positions for each vessel using a suitable geospatial library or custom function that can integrate
+* [x] Aggregate these distances by MMSI to get the total distance traveled by each vessel on that day.
+* [x] Sort or use an aggregation function to determine which vessel traveled the longest distance.
+* [x] The final output should be the MMSI of the vessel that traveled the longest distance, along with the computed distance.
 * [ ] Ensure the code is well-documented, explaining key PySpark transformations and actions used in the process.
 
 ## Deliverables
