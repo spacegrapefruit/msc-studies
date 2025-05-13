@@ -45,6 +45,7 @@ setwd("/home/aleks/msc-studies/multivariate_time_series/project")
 
 ```{r import-data}
 aq_data <- read_csv("data/input/city_hour.csv")
+pollutants <- c("PM2.5", "PM10", "NO", "NO2", "CO", "O3", "SO2", "NH3")
 
 aq_data <- aq_data %>%
   filter(
@@ -67,18 +68,46 @@ missing_pct <- aq_data %>%
 missing_pct
 ```
 
-> **Insight:** Variables with more than 5% missingness may require imputation or aggregation.
+> We may go for Delhi or Bhopal, as they have the least missing values (under 1%).
+> In any case, variables will require imputation.
 
 ```{r missing-values-imputation}
-# impute missing values with mean
+# impute missing values
 aq_data <- aq_data %>%
+  filter(
+    !City %in% c("Ahmedabad", "Gurugram", "Lucknow", "Patna")
+  ) %>%
   group_by(City) %>%
   mutate(across(
-    c(PM2.5, PM10, NO, NO2, CO, O3, SO2, NH3),
-    ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)
+    all_of(pollutants),
+    ~ forecast::na.interp(.)
   )) %>%
   ungroup()
 ```
+
+# 2. Transformation for Skewness
+
+Pollutant series are non-negative and right-skewed. We apply a log1p transform and compare distributions:
+
+```{r transform}
+# log1p transformation
+aq_data <- aq_data %>%
+  mutate(across(
+    all_of(pollutants),
+    ~ log1p(.)
+  ))
+
+aq_long <- aq_data %>%
+  select(Datetime, all_of(pollutants)) %>%
+  pivot_longer(-Datetime, names_to = "pollutant", values_to = "value")
+
+ggplot(aq_long, aes(x = value)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(~pollutant, scales = "free") +
+  labs(title = "Log1p-Transformed Pollutant Distributions")
+``` 
+
+> **Note:** Log transform stabilizes variance and handles zeros.
 
 # Exploratory Analysis for a Sample City
 
@@ -87,11 +116,15 @@ We illustrate with **Delhi**; results are similar across other cities.
 ```{r select-city}
 sample_city <- "Delhi"
 aq_city <- aq_data %>% filter(City == sample_city)
-pollutants <- c("PM2.5", "PM10", "NO", "NO2", "CO", "O3", "SO2", "NH3")
+
+# aggregate daily means
+aq_city_daily <- aq_city %>%
+  mutate(date = as_date(Datetime)) %>%
+  group_by(date) %>%
+  summarize(across(all_of(pollutants), mean, na.rm = TRUE))
 ```
 
 ```{r time-series-plot}
-# long format for faceting
 aq_city_long <- aq_city %>%
   select(Datetime, all_of(pollutants)) %>%
   pivot_longer(-Datetime, names_to = "pollutant", values_to = "value")
@@ -116,6 +149,11 @@ corrplot(corr_matrix,
 ```
 
 > **Observation:** PM2.5 and PM10 show strong positive correlation (0.81), while CO is negatively correlated with O3 and SO2.
+
+
+
+
+
 
 # Stationarity and Cointegration
 
@@ -148,20 +186,31 @@ summary(joh_res)
 
 > **Finding:** Johansen trace test suggests at least one cointegrating relationship (trace statistic > critical). This motivates a Vector Error Correction Model (VECM).
 
+
+
+```{r select-var-lag}
+# Determine optimal lag order for VAR on differenced daily data
+diff_data <- diff(ts(aq_city_daily %>% select(-date)))
+var_select <- vars::VARselect(diff_data, lag.max = 30, type = "const") # Adjust lag.max if needed
+print(var_select$selection)
+
+optimal_p <- var_select$selection["AIC(n)"] # Or SC(n) / BIC
+print(paste("Selected lag order (AIC):", optimal_p))
+```
+
+
+
+
 # Granger Causality
 
 Test whether pollutant X Granger-causes pollutant Y.
 
-```{r prepare-var}
-# aggregate daily means
-aq_daily <- aq_city %>%
-  mutate(date = as_date(Datetime)) %>%
-  group_by(date) %>%
-  summarize(across(all_of(pollutants), mean, na.rm = TRUE))
 
+```{r prepare-var}
 # build VAR on differenced data
-diff_data <- diff(ts(aq_daily %>% select(-date), frequency = 365))
-var_model <- vars::VAR(diff_data, p = 2, type = "const")
+var_model <- vars::VAR(diff_data, p = optimal_p, type = "const")
+
+varma_model <- MTS::VARMA(diff_data, p = 1, q = 0, include.mean = TRUE)
 ```
 
 ```{r granger-tests}
@@ -178,7 +227,7 @@ irf_res <- vars::irf(
   var_model,
   impulse = "NO",
   response = "NO2",
-  n.ahead = 30,
+  n.ahead = 14,
   boot = TRUE
 )
 plot(irf_res)
@@ -199,9 +248,3 @@ autoplot(fc) + labs(title = "2-Week Ahead Forecasts for Delhi Pollutants")
 - **Granger causality**: NO2 significantly predicts PM2.5 changes.
 - **Impulse responses**: NO2 shocks have medium-term effects on PM2.5.
 - **Forecasts** offer actionable insights for policy timing.
-
-```{r}
-# # determine optimal lag order for VAR
-# var_select <- VARselect(ts_data, lag.max = 14, type # = "const")
-# print(var_select$selection)
-```
