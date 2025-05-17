@@ -1,5 +1,5 @@
 ---
-title: "Multivariate Time Series EDA of Air Quality Data in India"
+title: "Multivariate Time Series Analysis of Air Quality in Delhi"
 author: "Aleksandr Jan Smoliakov"
 date: "`r Sys.Date()`"
 output:
@@ -20,11 +20,13 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Introduction
+# 1. Introduction
 
-Urban air pollution presents complex interactions among multiple pollutants. In this mini-report, we load hourly measurements from 20 Indian cities (2015-2020) and apply multivariate time series techniques to uncover dynamic dependencies, test for stationarity and causality, and generate forecasts.
+Urban air pollution arises from complex interactions among multiple pollutants. This report analyzes hourly air quality measurements from India, focusing on Delhi for a detailed multivariate time series investigation. We employ techniques to understand dynamic dependencies, test for stationarity and causality, model these interactions, and generate forecasts. Our period of interest is 2018-2019.
 
-# Data Loading and Preprocessing
+# 2. Data Loading and Preprocessing
+
+## 2.1. Load Packages
 
 ```{r load-packages}
 library(readr)
@@ -32,219 +34,429 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(lubridate)
-library(urca)
-library(corrplot)
 library(forecast)
-# library(tsibble)
-# library(feasts)
-# library(fable)
-# library(tseries)
+library(urca)
+# library(vars) # For VAR, Granger, IRF, FEVD
+library(MTS) # For VARMA
+library(corrplot)
 
 setwd("/home/aleks/msc-studies/multivariate_time_series/project")
 ```
 
-```{r import-data}
-aq_data <- read_csv("data/input/city_hour.csv")
-pollutants <- c("PM2.5", "PM10", "NO", "NO2", "CO", "O3", "SO2", "NH3")
+## 2.2. Import Data and Initial Filtering
 
-aq_data <- aq_data %>%
+```{r import-data}
+aq_data_full <- read_csv("data/input/city_hour.csv")
+
+pollutants <- c("PM2.5", "PM10", "NO2", "CO", "NH3")
+
+aq_data_filtered <- aq_data_full %>%
   filter(
-    Datetime < "2020-01-01",
+    Datetime >= "2018-01-01" & Datetime < "2020-01-02"
+  ) %>%
+  select(
+    Datetime, City, all_of(pollutants)
   ) %>%
   mutate(
     year = year(Datetime)
-  ) %>%
-  filter(year >= 2015, year <= 2019)
+  )
 
-# preview
-glimpse(aq_data)
+glimpse(aq_data_filtered)
 ```
+
+## 2.3. Handling Missing Values
 
 ```{r missing-values}
-# missingness percentage by variable
-missing_pct <- aq_data %>%
+# Missingness percentage by variable and city
+missing_pct <- aq_data_filtered %>%
   group_by(City) %>%
-  summarise(across(everything(), ~ sum(is.na(.)) / n() * 100))
-missing_pct
-```
+  summarise(across(all_of(pollutants), ~ sum(is.na(.)) / n() * 100), .groups = "drop")
+print(missing_pct)
 
-> We may go for Delhi or Bhopal, as they have the least missing values (under 1%).
-> In any case, variables will require imputation.
+# We may go for Delhi or Bhopal, as they have the least missing values (under 1%).
 
-```{r missing-values-imputation}
-# impute missing values
-aq_data <- aq_data %>%
-  filter(
-    !City %in% c("Ahmedabad", "Gurugram", "Lucknow", "Patna")
-  ) %>%
+# Filter cities with high missingness and impute for others
+cities_to_exclude <- c("Ahmedabad", "Gurugram", "Lucknow", "Patna")
+aq_data_imputed <- aq_data_filtered %>%
+  filter(!City %in% cities_to_exclude) %>%
   group_by(City) %>%
   mutate(across(
     all_of(pollutants),
-    ~ forecast::na.interp(.)
+    ~ forecast::na.interp(.) # Linear interpolation for missing values
   )) %>%
   ungroup()
+
+# Verify imputation
+sum(is.na(aq_data_imputed %>% select(all_of(pollutants))))
 ```
 
-# 2. Transformation for Skewness
+## 2.4. Data Transformation (Log1p)
 
-Pollutant series are non-negative and right-skewed. We apply a log1p transform and compare distributions:
+Pollutant series are non-negative and often right-skewed. A log1p transformation ($log(1+x)$) helps stabilize variance, normalize distributions, and handle potential zero values.
 
 ```{r transform}
-# log1p transformation
-aq_data <- aq_data %>%
+aq_data_transformed <- aq_data_imputed %>%
   mutate(across(
     all_of(pollutants),
     ~ log1p(.)
   ))
+```
 
-aq_long <- aq_data %>%
-  select(Datetime, all_of(pollutants)) %>%
-  pivot_longer(-Datetime, names_to = "pollutant", values_to = "value")
+## 2.5. Focus on Sample City (Delhi) and Daily Aggregation
 
-ggplot(aq_long, aes(x = value)) +
-  geom_histogram(bins = 50) +
-  facet_wrap(~pollutant, scales = "free") +
-  labs(title = "Log1p-Transformed Pollutant Distributions")
-``` 
+For detailed modeling, we focus on Delhi and aggregate hourly data to daily means to reduce noise and computational load for certain models.
 
-> **Note:** Log transform stabilizes variance and handles zeros.
-
-# Exploratory Analysis for a Sample City
-
-We illustrate with **Delhi**; results are similar across other cities.
-
-```{r select-city}
+```{r select-city-daily-agg}
 sample_city <- "Delhi"
-aq_city <- aq_data %>% filter(City == sample_city)
+aq_city_hourly <- aq_data_transformed %>% filter(City == sample_city)
 
-# aggregate daily means
-aq_city_daily <- aq_city %>%
+aq_city_daily <- aq_city_hourly %>%
   mutate(date = as_date(Datetime)) %>%
   group_by(date) %>%
-  summarize(across(all_of(pollutants), mean, na.rm = TRUE))
+  summarize(across(all_of(pollutants), mean, na.rm = TRUE), .groups = "drop")
+
+# Convert to time series object for modeling
+ts_aq_city_daily <- ts(aq_city_daily %>% select(all_of(pollutants)),
+  start = c(year(min(aq_city_daily$date)), yday(min(aq_city_daily$date))),
+  frequency = 365
+) # Approximate for daily data, or 1 if irregular
+
+glimpse(ts_aq_city_daily)
+
+# Visualize distributions post-transformation for a sample city (Delhi)
+aq_long_delhi_daily_transformed <- aq_city_daily %>%
+  select(date, all_of(pollutants)) %>%
+  pivot_longer(-date, names_to = "pollutant", values_to = "value")
+
+p1 <- ggplot(aq_long_delhi_daily_transformed, aes(x = value)) +
+  geom_histogram(bins = 35, fill = "steelblue", alpha = 0.7) +
+  facet_wrap(~pollutant, scales = "free") +
+  labs(
+    title = "Daily Mean Log1p-Transformed Pollutant Distributions in Delhi (2018-2019)",
+    x = "Log1p(Concentration)",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  # font size for half width plot
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    strip.text = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+
+ggsave("analysis/assets/log1p_delhi_distributions.png", plot = p1, width = 10, height = 6)
 ```
 
-```{r time-series-plot}
-aq_city_long <- aq_city %>%
-  select(Datetime, all_of(pollutants)) %>%
-  pivot_longer(-Datetime, names_to = "pollutant", values_to = "value")
+# 3. Exploratory Data Analysis (Delhi - Daily Data)
 
-ggplot(aq_city_long, aes(x = Datetime, y = value, color = pollutant)) +
-  geom_line(alpha = 0.6) +
-  facet_wrap(~pollutant, scales = "free_y") +
+## 3.1. Time Series Plots
+
+```{r time-series-plot-daily}
+p2 <- autoplot(ts_aq_city_daily, facets = TRUE) +
   labs(
-    title = paste("Hourly Pollutant Concentrations in", sample_city),
-    x = "Time",
-    y = "Concentration"
+    title = paste("Daily Mean Log1p-Transformed Pollutant Concentrations in", sample_city),
+    x = "Time", y = "Log1p(Concentration)"
   ) +
   theme_minimal()
+
+ggsave("analysis/assets/daily_ts_delhi.png", plot = p2, width = 10, height = 6)
 ```
 
-```{r correlation-heatmap}
-corr_matrix <- cor(na.omit(aq_city %>% select(all_of(pollutants))))
-corrplot(corr_matrix,
-  method = "color", type = "upper",
-  tl.cex = 0.8, addCoef.col = "black", number.cex = 0.7
+## 3.2. Correlation Analysis
+
+```{r correlation-heatmap-daily}
+corr_matrix_daily <- cor(na.omit(ts_aq_city_daily))
+
+png("analysis/assets/corrplot_delhi.png", width = 800, height = 600)
+corrplot(
+  corr_matrix_daily,
+  method = "color", type = "upper", order = "hclust",
+  tl.col = "black", tl.srt = 45, tl.cex = 1.5,
+  addCoef.col = "black", number.cex = 1.5,
+  cl.cex = 1.5,
+  title = "Correlation Matrix of Daily Log1p-Transformed Pollutants in Delhi",
+  cex.main = 1.8,
+  mar = c(0, 0, 1, 0)
+)
+dev.off()
+
+# show the plot
+corrplot(
+  corr_matrix_daily,
+  method = "color", type = "upper", order = "hclust",
+  tl.col = "black", tl.srt = 45, tl.cex = 0.8,
+  addCoef.col = "black", number.cex = 0.7,
+  cl.cex = 0.8,
+  title = "Correlation Matrix of Daily Log1p-Transformed Pollutants in Delhi",
+  mar = c(0, 0, 1, 0)
 )
 ```
 
-> **Observation:** PM2.5 and PM10 show strong positive correlation (0.81), while CO is negatively correlated with O3 and SO2.
+**Observation:** In the daily data, all pollutants are positively correlated, with PM2.5 and PM10 showing the strongest correlation (0.93).
 
+## 3.3. Seasonal Decomposition
 
+Air quality data typically exhibits strong seasonality. We can decompose a key series like PM2.5 using STL (Seasonal and Trend decomposition using Loess) to visualize these components.
 
-
-
-
-# Stationarity and Cointegration
-
-We apply Augmented Dickey-Fuller tests and Johansen cointegration.
-
-```{r adf-tests}
-adf_results <- data.frame(
-  pollutant = pollutants,
-  statistic = numeric(length(pollutants)),
-  p.value = numeric(length(pollutants))
-)
-for (i in seq_along(pollutants)) {
-  series <- na.omit(aq_city[[pollutants[i]]])
-  test <- ur.df(series, type = "drift", selectlags = "AIC")
-  adf_results$statistic[i] <- test@teststat[1]
-  adf_results$p.value[i] <- test@cval[1, "5pct"] < test@teststat[1]
+```{r stl-decomposition-daily}
+for (pollutant in pollutants) {
+  stl_plot <- stl(ts_aq_city_daily[, pollutant], s.window = "periodic")
+  plot(stl_plot, main = paste("STL Decomposition of", pollutant, "in Delhi"))
 }
-adf_results
 ```
 
-> **Result:** Most series are non-stationary in levels (fail ADF at 5%), so we difference before VAR modeling.
+**Typical Finding:** Strong annual seasonality is often visible, with higher pollution in winter months and lower levels during monsoon/summer. Weekly patterns related to human activity might also be present. This underscores the importance of addressing seasonality in modeling.
 
-```{r johansen-test}
-joh_res <- ca.jo(
-  na.omit(aq_city %>% select(all_of(pollutants))),
-  type = "trace", ecdet = "const", K = 2
+# 4. Stationarity and Cointegration Analysis (Delhi - Daily Data)
+
+## 4.1. Augmented Dickey-Fuller (ADF) Tests
+
+We test for unit roots in the levels of (log1p-transformed, daily mean) pollutant series.
+
+```{r adf-tests-daily}
+adf_results_daily <- data.frame(
+  pollutant = colnames(ts_aq_city_daily),
+  statistic = numeric(ncol(ts_aq_city_daily)),
+  p_value_approx = character(ncol(ts_aq_city_daily)), # More direct p-value if package allows
+  is_stationary_5pct = logical(ncol(ts_aq_city_daily))
 )
-summary(joh_res)
+
+for (i in seq_along(colnames(ts_aq_city_daily))) {
+  series <- ts_aq_city_daily[, pollutants[i]]
+  # Using type="drift" as an example, "trend" could also be considered
+  test <- ur.df(series, type = "drift", selectlags = "AIC")
+  adf_results_daily$statistic[i] <- test@teststat[1]
+  # ur.df doesn't give p-value directly, compare test stat with critical values
+  adf_results_daily$is_stationary_5pct[i] <- test@teststat[1] < test@cval[1, "5pct"]
+  adf_results_daily$p_value_approx[i] <- ifelse(test@teststat[1] < test@cval[1, "1pct"], "<0.01",
+    ifelse(test@teststat[1] < test@cval[1, "5pct"], "<0.05",
+      ifelse(test@teststat[1] < test@cval[1, "10pct"], "<0.10", ">0.10")
+    )
+  )
+}
+print(adf_results_daily)
 ```
 
-> **Finding:** Johansen trace test suggests at least one cointegrating relationship (trace statistic > critical). This motivates a Vector Error Correction Model (VECM).
+**Result:** For all pollutants, the ADF test statistic is highly negative, and the p-value is <0.01.
+Consequently, `is_stationary_5pct` is TRUE for all series. We conclude that all series are stationary (I(0)).
 
+# 5. Multivariate Time Series Modeling (Delhi - Daily Data)
 
+## 5.1. VAR (Vector Autoregression) Model
 
-```{r select-var-lag}
-# Determine optimal lag order for VAR on differenced daily data
-diff_data <- diff(ts(aq_city_daily %>% select(-date)))
-var_select <- vars::VARselect(diff_data, lag.max = 30, type = "const") # Adjust lag.max if needed
+Series are I(0), so we can fit a VAR model directly on the levels. If series are I(1), we would first difference them.
+
+### 5.1.1. Lag Order Selection for VAR
+
+We select the optimal lag order `p` for the VAR model.
+
+```{r select-var-lag-daily}
+# Determine optimal lag order
+var_select <- vars::VARselect(ts_aq_city_daily, lag.max = 30, type = "const") # Max 30 days for daily data
 print(var_select$selection)
-
-optimal_p <- var_select$selection["AIC(n)"] # Or SC(n) / BIC
-print(paste("Selected lag order (AIC):", optimal_p))
+optimal_p <- var_select$selection["AIC(n)"] # Or SC(n)/BIC
+print(paste("Selected lag order (AIC) for VAR:", optimal_p))
 ```
 
+### 5.1.2. VAR Model Fitting
 
-
-
-# Granger Causality
-
-Test whether pollutant X Granger-causes pollutant Y.
-
-
-```{r prepare-var}
-# build VAR on differenced data
-var_model <- vars::VAR(diff_data, p = optimal_p, type = "const")
-
-varma_model <- MTS::VARMA(diff_data, p = 1, q = 0, include.mean = TRUE)
+```{r fit-var-daily}
+var_model <- vars::VAR(ts_aq_city_daily, p = optimal_p, type = "const")
+summary(var_model)
 ```
 
-```{r granger-tests}
-grange_res <- vars::causality(var_model, cause = "NO2")
-print(grange_res$Granger)
+## 5.2. VARMA (Vector Autoregressive Moving Average) Model
+
+VARMA models generalize VARs by including MA terms, potentially offering more parsimonious models. They are fitted on level data (or stationary data).
+
+```{r fit-varma-daily}
+# Determining optimal p, q is very computationally intensive.
+p_varma <- 1 # order$p
+q_varma <- 1 # order$q
+
+# Fit VARMA on levels (original log-transformed daily data)
+varma_mod <- MTS::VARMA(ts_aq_city_daily, p = p_varma, q = q_varma, include.mean = TRUE)
+
+print(summary(varma_mod))
 ```
 
-> **Interpretation:** Significant p-value (p < 0.01) indicates NO2 levels help predict PM2.5 fluctuations.
+# 6. Model Applications and Diagnostics (from VAR Model)
 
-# Impulse Response and Forecasting
+## 6.1. Granger Causality
 
-```{r irf-plot}
-irf_res <- vars::irf(
+Tests whether past values of one pollutant help predict current values of another, given past values of all pollutants.
+
+```{r granger-tests-daily}
+for (i in seq_along(pollutants)) {
+  granger_test <- vars::causality(var_model, cause = pollutants[i])
+  print(paste("Granger causality from", pollutants[i], "to others:"))
+  print(granger_test$Granger)
+}
+
+# causality_results <- data.frame(
+#   pollutant = pollutants,
+#   granger_p_value = sapply(pollutants, function(p) {
+#     granger_test <- vars::causality(var_model, cause = p)
+#     granger_test$Granger$p.value
+#   })
+# )
+# for (i in seq_along(pollutants)) {
+#   for (j in seq_along(pollutants)) {
+#     if (i != j) {
+#       var_model_temp <- vars::VAR(ts_aq_city_daily[, c(pollutants[i], pollutants[j])], p = optimal_p, type = "const")
+#       granger_test <- vars::causality(var_model_temp, cause = pollutants[i])
+#       causality_results <- rbind(causality_results, data.frame(
+#         pollutant = pollutants[i],
+#         granger_p_value = granger_test$Granger$p.value
+#       ))
+#     }
+#   }
+# }
+```
+
+**Interpretation:** The p-value of 0.033 indicates that NO2 Granger-causes other pollutants, suggesting that past values of NO2 help predict current values of PM2.5, PM10, CO, and NH3.
+
+## 6.2. Impulse Response Functions (IRFs)
+
+IRFs trace the effect of a one-time shock (typically one standard deviation) in one pollutant on current and future values of itself and other pollutants.
+
+```{r irf-plot-daily}
+png("analysis/assets/irf_no2_others.png", width = 800, height = 600)
+# Response other pollutants to a shock in NO2
+irf_no2_to_co <- vars::irf(
   var_model,
-  impulse = "NO",
-  response = "NO2",
-  n.ahead = 14,
-  boot = TRUE
+  impulse = "NO2", # The variable receiving the shock
+  # response = "CO", # The variable whose response we observe
+  n.ahead = 14, # Forecast horizon for the response (e.g., 14 days)
+  boot = TRUE, # Use bootstrapping for confidence intervals
+  ci = 0.95 # 95% confidence interval
 )
-plot(irf_res)
+plot(
+  irf_no2_to_co,
+  main = "Impulse Response: NO2 shock to other pollutants",
+  xlab = "Days Ahead",
+  # ylab = "Response",
+  # font size for half width plot
+  cex.main = 2.5,
+  cex.lab = 1.2,
+  cex.axis = 2.0
+)
+dev.off()
+
+# show the plot
+plot(
+  irf_no2_to_co,
+  main = "Impulse Response: NO2 shock to other pollutants"
+)
 ```
 
-```{r forecast-var}
-fc <- forecast(var_model, h = 14)
-autoplot(fc) + labs(title = "2-Week Ahead Forecasts for Delhi Pollutants")
+**Insight:** IRFs can quantify the magnitude and duration of such inter-pollutant influences. A positive shock to NO2 leads to a temporary increase in CO.
+
+## 6.3. Forecast Error Variance Decomposition (FEVD)
+
+FEVD decomposes the forecast error variance of each pollutant into proportions attributable to shocks from itself and from other pollutants.
+
+```{r fevd-daily}
+png("analysis/assets/fevd_delhi.png", width = 800, height = 600)
+fevd_var <- vars::fevd(var_model, n.ahead = 14) # Decompose for 14 days ahead
+# Plot FEVD
+plot(
+  fevd_var,
+  xlab = "Days Ahead"
+)
+dev.off()
 ```
 
-> **Insight:** Impulse responses reveal that a shock in NO2 leads to a 5-7 day elevated PM2.5 response, decaying after ~10 days.
+**Insight:** FEVD shows the relative importance of different pollutants in driving the forecast uncertainty of a particular pollutant over time. A large proportion of other pollutants' error variance is attributable to PM2.5, indicating its influence on the system.
 
-# Summary of Key Findings
+# 7. Forecasting Comparison (Delhi - Daily)
 
-- **High correlation** between PM2.5 and PM10 suggests shared emission sources.
-- **Non-stationarity** in levels necessitates differencing or VECM.
-- **Cointegration** indicates long-run equilibrium among pollutants.
-- **Granger causality**: NO2 significantly predicts PM2.5 changes.
-- **Impulse responses**: NO2 shocks have medium-term effects on PM2.5.
-- **Forecasts** offer actionable insights for policy timing.
+## 7.1. Data Splitting (Train/Test)
+
+We split the daily data into a training set and a test set (last 14 days) to evaluate forecast accuracy.
+
+```{r forecast-split-daily}
+# Using the log-transformed daily data (levels) for y_levels
+y_levels <- ts_aq_city_daily
+total_obs <- nrow(y_levels)
+forecast_horizon <- 14
+train_len <- total_obs - forecast_horizon
+
+train_levels <- window(y_levels, end = time(y_levels)[train_len])
+test_levels <- window(y_levels, start = time(y_levels)[train_len + 1])
+```
+
+## 7.2. VAR Model Forecasting
+
+```{r forecast-var-daily}
+var_model_train <- vars::VAR(train_levels, p = optimal_p, type = "const")
+# predict() for varest automatically inverts to level forecasts
+fc_var_list <- predict(var_model_train, n.ahead = forecast_horizon, ci = 0.95)
+
+rmse_var <- list()
+for (i in seq_along(pollutants)) {
+  fc_var_point <- fc_var_list$fcst[[i]][, "fcst"]
+  rmse_var[[pollutants[i]]] <- sqrt(mean((test_levels[, pollutants[i]] - fc_var_point)^2, na.rm = TRUE))
+}
+print(rmse_var)
+```
+
+## 7.3. VARMA Model Forecasting
+
+```{r forecast-varma-daily}
+varma_mod_train <- MTS::VARMA(train_levels, p = p_varma, q = q_varma, include.mean = TRUE)
+yf_varma_train_list <- MTS::VARMApred(varma_mod_train, h = forecast_horizon)
+
+rmse_varma_list <- list()
+for (i in seq_along(pollutants)) {
+  fc_varma_point <- yf_varma_train_list$pred[, pollutants[i]]
+  rmse_varma_list[[pollutants[i]]] <- sqrt(mean((test_levels[, pollutants[i]] - fc_varma_point)^2, na.rm = TRUE))
+}
+print(rmse_varma_list)
+```
+
+## 7.4. RMSE Comparison for Forecast Accuracy
+
+```{r forecast-compare-rmse}
+forecast_comparison <- data.frame(
+  Model = c("VAR(4)", "VARMA(1, 1)"),
+  PM2.5 = c(rmse_var[["PM2.5"]], rmse_varma_list[["PM2.5"]]),
+  PM10 = c(rmse_var[["PM10"]], rmse_varma_list[["PM10"]]),
+  NO2 = c(rmse_var[["NO2"]], rmse_varma_list[["NO2"]]),
+  CO = c(rmse_var[["CO"]], rmse_varma_list[["CO"]]),
+  NH3 = c(rmse_var[["NH3"]], rmse_varma_list[["NH3"]])
+)
+print(forecast_comparison)
+```
+
+**Result:** The RMSE values indicate that the VARMA model outperforms the VAR model for all pollutants, suggesting that the inclusion of MA terms improves forecast accuracy.
+
+## 7.5. Visualizing VAR Forecasts
+
+Forecasts from the main VAR model (trained on full data) for all pollutants.
+
+```{r plot-forecast-var-full}
+# fc_all_pollutants <- MTS::VARMApred(varma_mod, h = forecast_horizon)
+fc_all_pollutants <- forecast::forecast(var_model, h = forecast_horizon)
+
+p3 <- autoplot(fc_all_pollutants) +
+  labs(
+    title = paste(forecast_horizon, "-Day Ahead Forecasts for Delhi Pollutants (from VAR on full data)"),
+    x = "Time", y = "Log1p(Concentration)"
+  ) +
+  theme_minimal()
+ggsave("analysis/assets/var_forecast_delhi.png", plot = p3, width = 10, height = 6)
+```
+
+# 8. Summary of Key Findings and Conclusion
+
+This analysis of Delhi's air quality data (2018-2019) for key pollutants (PM2.5, PM10, NO2, CO, and NH3) reveals several key insights:
+
+The daily mean concentrations of these pollutants, after log1p transformation to stabilize variance, were found to be stationary. This allowed for the direct modeling of their interdependencies using a Vector Autoregressive Moving Average (VARMA(1,1)) model. This model successfully captured the complex linear relationships, indicating significant own-lag effects and cross-pollutant dynamics, highlighting the interconnected nature of these air pollutants.
+
+Granger causality tests indicated, for instance, that past values of NO2 have significant predictive power for the other pollutants in the system (PM2.5, PM10, CO, and NH3, p-value ≈ 0.033 for the joint test). Further investigation via Forecast Error Variance Decomposition (FEVD) suggested that unexpected shocks in PM2.5 contribute substantially to the forecast uncertainty of other pollutants, underscoring its central role in the system's dynamics.
+
+Overall, the VARMA framework proved effective for characterizing the mean dynamics and generating forecasts, while specialized tests and decompositions helped quantify the influence and predictive power among the selected pollutants. This comprehensive approach provides a valuable understanding of Delhi's air pollution dynamics, which can inform further research and potential mitigation strategies.
