@@ -1,5 +1,5 @@
 import logging
-from math import radians, cos, sin, asin, sqrt
+import math
 from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lag, udf, sum as spark_sum, desc
@@ -7,28 +7,33 @@ from pyspark.sql.window import Window
 from pyspark.sql.types import DoubleType, TimestampType
 
 from config import Config
-# from utils import haversine_distance
+
+EARTH_RADIUS = 6_378  # in kilometers
 
 
-def haversine_distance(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
-    """
-    Compute the great-circle distance between two points
-    on the Earth specified in decimal degrees.
-    Returns distance in kilometers.
-    """
-    if lon1 is None or lat1 is None or lon2 is None or lat2 is None:
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate the Haversine distance between two (lat, lon) points in kilometers."""
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
         return None
 
-    # convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-
-    # haversine formula
-    dlon = lon2 - lon1
+    raw_lat1 = lat1
+    raw_lon1 = lon1
+    raw_lat2 = lat2
+    raw_lon2 = lon2
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-    c = 2 * asin(sqrt(a))
-    km = 6371 * c
-    return km
+    dlon = lon2 - lon1
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.asin(math.sqrt(a))
+    if c * EARTH_RADIUS > 2000:
+        logging.warning(
+            f"Distance too large: {c * EARTH_RADIUS:.2f} km, "
+            f"lat1={raw_lat1}, lon1={raw_lon1}, lat2={raw_lat2}, lon2={raw_lon2}"
+        )
+    return c * EARTH_RADIUS
 
 
 if __name__ == "__main__":
@@ -45,8 +50,12 @@ if __name__ == "__main__":
     spark = SparkSession.builder.appName("LongestVesselRoute").getOrCreate()
     logging.info("Spark session started.")
 
-    # Load CSV (adjust header/inferSchema as necessary)
-    df = spark.read.csv(config.input_file, header=True, inferSchema=True)
+    # Load CSV data
+    df = spark.read.csv(
+        config.input_file,
+        header=True,
+        inferSchema=True,
+    )
     logging.info(f"Data loaded from {config.input_file}, total records: {df.count()}")
 
     # Rename Timestamp, ensure correct column types
@@ -55,6 +64,8 @@ if __name__ == "__main__":
         .withColumn("Timestamp", col("Timestamp").cast(TimestampType()))
         .withColumn("Latitude", col("Latitude").cast(DoubleType()))
         .withColumn("Longitude", col("Longitude").cast(DoubleType()))
+        # remove invalid coordinates
+        .filter((col("Latitude").between(-90, 90)) & (col("Longitude").between(-180, 180)))
     )
     logging.info("Data types corrected.")
 
@@ -70,7 +81,7 @@ if __name__ == "__main__":
         .withColumn(
             "segment_km",
             haversine_udf(
-                col("prev_lon"), col("prev_lat"), col("Longitude"), col("Latitude")
+                col("prev_lat"), col("prev_lon"), col("Latitude"), col("Longitude")
             ),
         )
     )
@@ -84,14 +95,14 @@ if __name__ == "__main__":
     )
 
     # Find the vessel with the maximum total distance
-    longest = total_dist.orderBy(desc("total_km")).limit(1).collect()
+    longest = total_dist.orderBy(desc("total_km")).limit(5).collect()
 
     if longest:
-        mmsi, dist = longest[0]["mmsi"], longest[0]["total_km"]
-        print(
-            f"Vessel with longest route on 2024-05-04: MMSI={mmsi}, Distance={dist:.2f} km"
-        )
+        logging.info("Vessels with longest routes on 2024-05-04:")
+        for i, row in enumerate(longest):
+            mmsi, dist = row["mmsi"], row["total_km"]
+            logging.info(f"  Rank {i + 1}: MMSI={mmsi}, Distance={dist:.2f} km")
     else:
-        print("No data found for that date.")
+        logging.warning("No data found for that date.")
 
     spark.stop()
