@@ -1,4 +1,4 @@
-.PHONY: all install-poetry install-pip format
+.PHONY: all install-poetry install-pip main format
 
 all: install-poetry main
 

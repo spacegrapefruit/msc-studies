@@ -15,9 +15,9 @@ The provided dataset contains Automatic Identification System (AIS) data for ves
 * [x] Aggregate these distances by MMSI to get the total distance traveled by each vessel on that day.
 * [x] Sort or use an aggregation function to determine which vessel traveled the longest distance.
 * [x] The final output should be the MMSI of the vessel that traveled the longest distance, along with the computed distance.
-* [ ] Ensure the code is well-documented, explaining key PySpark transformations and actions used in the process.
+* [x] Ensure the code is well-documented, explaining key PySpark transformations and actions used in the process.
 
 ## Deliverables
 
-* [ ] A PySpark script that completes the task from loading to calculating and outputting the longest route.
-* [ ] A brief report or set of comments within the code that discusses the findings and any interesting insights about the data or the computation process.
+* [x] A PySpark script that completes the task from loading to calculating and outputting the longest route.
+* [x] A brief report or set of comments within the code that discusses the findings and any interesting insights about the data or the computation process.

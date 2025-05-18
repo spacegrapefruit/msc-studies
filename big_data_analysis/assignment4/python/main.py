@@ -2,13 +2,24 @@ import logging
 import math
 from pathlib import Path
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lag, udf, sum as spark_sum, desc
+from pyspark.sql.functions import (
+    col,
+    greatest,
+    lag,
+    lit,
+    udf,
+    sum as spark_sum,
+    to_timestamp,
+    desc,
+    when,
+)
 from pyspark.sql.window import Window
 from pyspark.sql.types import DoubleType, TimestampType
 
 from config import Config
 
 EARTH_RADIUS = 6_378  # in kilometers
+TIMESTAMP_FORMAT = "dd/MM/yyyy HH:mm:ss"
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -16,10 +27,6 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
         return None
 
-    raw_lat1 = lat1
-    raw_lon1 = lon1
-    raw_lat2 = lat2
-    raw_lon2 = lon2
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
     dlon = lon2 - lon1
@@ -28,12 +35,8 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
         + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     )
     c = 2 * math.asin(math.sqrt(a))
-    if c * EARTH_RADIUS > 2000:
-        logging.warning(
-            f"Distance too large: {c * EARTH_RADIUS:.2f} km, "
-            f"lat1={raw_lat1}, lon1={raw_lon1}, lat2={raw_lat2}, lon2={raw_lon2}"
-        )
-    return c * EARTH_RADIUS
+    distance_km = c * EARTH_RADIUS
+    return distance_km
 
 
 if __name__ == "__main__":
@@ -46,11 +49,16 @@ if __name__ == "__main__":
     config_path = Path(__file__).parent.parent / "config.yml"
     config = Config(config_path, "main")
 
-    # Initialize Spark
-    spark = SparkSession.builder.appName("LongestVesselRoute").getOrCreate()
+    # initialize Spark
+    spark = (
+        SparkSession.builder.appName("LongestVesselRoute")
+        # give it 4GB of memory
+        .config("spark.driver.memory", "4g")
+        .getOrCreate()
+    )
     logging.info("Spark session started.")
 
-    # Load CSV data
+    # load CSV data
     df = spark.read.csv(
         config.input_file,
         header=True,
@@ -58,25 +66,89 @@ if __name__ == "__main__":
     )
     logging.info(f"Data loaded from {config.input_file}, total records: {df.count()}")
 
-    # Rename Timestamp, ensure correct column types
+    # rename Timestamp, ensure correct column types
     df = (
         df.withColumnRenamed("# Timestamp", "Timestamp")
-        .withColumn("Timestamp", col("Timestamp").cast(TimestampType()))
+        .withColumn("Timestamp", to_timestamp(col("Timestamp"), TIMESTAMP_FORMAT))
         .withColumn("Latitude", col("Latitude").cast(DoubleType()))
         .withColumn("Longitude", col("Longitude").cast(DoubleType()))
-        # remove invalid coordinates
-        .filter((col("Latitude").between(-90, 90)) & (col("Longitude").between(-180, 180)))
+        .withColumn("MMSI", col("MMSI").cast("string"))
+        # filter out invalid coordinates
+        .filter(
+            (col("Latitude").between(-90, 90)) & (col("Longitude").between(-180, 180))
+        )
     )
-    logging.info("Data types corrected.")
+    logging.info("Data types corrected and invalid coordinates filtered.")
 
-    # Define a UDF for haversine distance
+    # define a UDF for haversine distance
     haversine_udf = udf(haversine_distance, DoubleType())
 
-    # Window to get previous point per vessel ordered by time
+    # window to get previous point per vessel ordered by time
     vessel_window = Window.partitionBy("MMSI").orderBy("Timestamp")
 
-    df_dist = (
+    # phase 1: ban vessels with excessive speed
+    logging.info("Identifying vessels with speeds over 200 m/s...")
+    df_with_prev_data = (
         df.withColumn("prev_lat", lag("Latitude").over(vessel_window))
+        .withColumn("prev_lon", lag("Longitude").over(vessel_window))
+        .withColumn("prev_timestamp", lag("Timestamp").over(vessel_window))
+    )
+
+    # calculate distance segments and time difference
+    df_segments_for_speed_check = df_with_prev_data.withColumn(
+        "segment_km_check",
+        haversine_udf(
+            col("prev_lat"), col("prev_lon"), col("Latitude"), col("Longitude")
+        ),
+    ).withColumn(
+        "time_diff_seconds",
+        col("Timestamp").cast("long") - col("prev_timestamp").cast("long"),
+    )
+
+    # condition for banning: speed > 200 m/s
+    condition_speed_ban = (
+        col("segment_km_check").isNotNull()
+        & col("time_diff_seconds").isNotNull()
+        & (
+            (
+                (col("segment_km_check") * 1000)
+                # max(time_diff, 1 second)
+                / greatest(col("time_diff_seconds"), lit(1))
+            )
+            > 200.0
+        )
+    )
+
+    # filter vessels to ban
+    banned_mmsi_df = (
+        df_segments_for_speed_check.filter(condition_speed_ban)
+        .select("MMSI")
+        .distinct()
+    )
+
+    banned_count = banned_mmsi_df.count()
+    if banned_count > 0:
+        logging.info(f"Found {banned_count} vessels to ban due to excessive speed.")
+    else:
+        logging.info("No vessels found exceeding the speed limit of 200 m/s.")
+
+    # phase 2: process valid vessels
+    df_valid_vessels = df.join(banned_mmsi_df, "MMSI", "left_anti")
+
+    original_record_count = df.count()
+    valid_record_count = df_valid_vessels.count()
+    logging.info(
+        f"Original records: {original_record_count}. Records after removing banned vessels: {valid_record_count}."
+    )
+
+    if valid_record_count == 0:
+        logging.warning("No valid vessel data remains after filtering. Exiting.")
+        spark.stop()
+        exit(0)
+
+    # calculate distance segments for valid vessels
+    df_dist = (
+        df_valid_vessels.withColumn("prev_lat", lag("Latitude").over(vessel_window))
         .withColumn("prev_lon", lag("Longitude").over(vessel_window))
         .withColumn(
             "segment_km",
@@ -85,24 +157,22 @@ if __name__ == "__main__":
             ),
         )
     )
-    logging.info("Distance segments calculated.")
+    logging.info("Distance segments calculated for valid vessels.")
 
-    # Sum distances per vessel (skip first null segment)
+    # sum distances per vessel
     total_dist = (
-        df_dist.na.fill({"segment_km": 0.0})
-        .groupBy("mmsi")
+        df_dist.na.fill({"segment_km": 0.0})  # Fill first row with 0.0
+        .groupBy("MMSI")
         .agg(spark_sum("segment_km").alias("total_km"))
     )
 
-    # Find the vessel with the maximum total distance
+    # find the vessels with the maximum total distance
     longest = total_dist.orderBy(desc("total_km")).limit(5).collect()
 
-    if longest:
-        logging.info("Vessels with longest routes on 2024-05-04:")
-        for i, row in enumerate(longest):
-            mmsi, dist = row["mmsi"], row["total_km"]
-            logging.info(f"  Rank {i + 1}: MMSI={mmsi}, Distance={dist:.2f} km")
-    else:
-        logging.warning("No data found for that date.")
+    logging.info("Top Vessels with longest routes (excluding speed-banned vessels):")
+    for i, row in enumerate(longest):
+        mmsi, dist = row["MMSI"], row["total_km"]
+        logging.info(f"  Rank {i + 1}: MMSI={mmsi}, Distance={dist:.2f} km")
 
     spark.stop()
+    logging.info("Spark session stopped.")
