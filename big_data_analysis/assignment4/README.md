@@ -31,10 +31,12 @@ The script is designed to be configurable via a `config.yml` file for input para
    ais_2024-05-04.csv
    ```
 
+4. Alter the `config.yml` file to point to the correct input file path. The default is set to `data/input/aisdk-2024-05-04.csv`.
+
 ## Running the pipeline
 
 ```bash
-python main.py /path/to/ais_2024-05-04.csv
+python main.py
 ```
 
 It will output the MMSI and total kilometers traveled.
