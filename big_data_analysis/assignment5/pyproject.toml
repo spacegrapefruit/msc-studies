@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "assignment5"
+version = "0.1.0"
+description = ""
+authors = ["Aleksandr J. Smoliakov <aleksandr.smoliakov@mif.stud.vu.lt>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10, <3.12"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.8"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
