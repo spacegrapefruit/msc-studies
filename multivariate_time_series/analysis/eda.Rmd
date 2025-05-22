@@ -40,7 +40,7 @@ library(urca)
 library(MTS) # For VARMA
 library(corrplot)
 
-setwd("/home/aleks/msc-studies/multivariate_time_series/project")
+setwd("/home/aleks/msc-studies/multivariate_time_series")
 ```
 
 ## 2.2. Import Data and Initial Filtering
@@ -324,32 +324,33 @@ for (i in seq_along(pollutants)) {
 IRFs trace the effect of a one-time shock (typically one standard deviation) in one pollutant on current and future values of itself and other pollutants.
 
 ```{r irf-plot-daily}
-png("analysis/assets/irf_no2_others.png", width = 800, height = 600)
 # Response other pollutants to a shock in NO2
-irf_no2_to_co <- vars::irf(
+irf_nh3_to_no2 <- vars::irf(
   var_model,
-  impulse = "NO2", # The variable receiving the shock
-  # response = "CO", # The variable whose response we observe
+  impulse = "NH3", # The variable receiving the shock
+  response = "NO2", # The variable whose response we observe
   n.ahead = 14, # Forecast horizon for the response (e.g., 14 days)
   boot = TRUE, # Use bootstrapping for confidence intervals
   ci = 0.95 # 95% confidence interval
 )
+png("analysis/assets/irf_nh3_no2.png", width = 900, height = 500)
 plot(
-  irf_no2_to_co,
-  main = "Impulse Response: NO2 shock to other pollutants",
+  irf_nh3_to_no2,
+  main = "Impulse Response: NH3 shock to NO2",
   xlab = "Days Ahead",
   # ylab = "Response",
-  # font size for half width plot
   cex.main = 2.5,
-  cex.lab = 1.2,
-  cex.axis = 2.0
+  cex.lab = 1.5,
+  cex.axis = 1.5,
+  cex.sub = 1.5,
+  cex.main = 2.5
 )
 dev.off()
 
 # show the plot
 plot(
-  irf_no2_to_co,
-  main = "Impulse Response: NO2 shock to other pollutants"
+  irf_nh3_no2,
+  main = "Impulse Response: NH3 shock to NO2",
 )
 ```
 
@@ -360,12 +361,13 @@ plot(
 FEVD decomposes the forecast error variance of each pollutant into proportions attributable to shocks from itself and from other pollutants.
 
 ```{r fevd-daily}
-png("analysis/assets/fevd_delhi.png", width = 800, height = 600)
+png("analysis/assets/fevd_delhi.png", width = 1000, height = 650)
 fevd_var <- vars::fevd(var_model, n.ahead = 14) # Decompose for 14 days ahead
 # Plot FEVD
 plot(
   fevd_var,
-  xlab = "Days Ahead"
+  xlab = "Days Ahead",
+  col = c("red", "blue", "green", "purple", "orange"),
 )
 dev.off()
 ```
@@ -444,9 +446,11 @@ fc_all_pollutants <- forecast::forecast(var_model, h = forecast_horizon)
 
 p3 <- autoplot(fc_all_pollutants) +
   labs(
-    title = paste(forecast_horizon, "-Day Ahead Forecasts for Delhi Pollutants (from VAR on full data)"),
+    title = paste0(forecast_horizon, "-Day Ahead Forecasts for Delhi Pollutants (from VAR on full data)"),
     x = "Time", y = "Log1p(Concentration)"
   ) +
+  scale_x_continuous(breaks = seq(2019, 2020, by = 0.2)) +
+  xlim(2019, 2020.04) +
   theme_minimal()
 ggsave("analysis/assets/var_forecast_delhi.png", plot = p3, width = 10, height = 6)
 ```
