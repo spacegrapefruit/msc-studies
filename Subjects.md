@@ -1,7 +1,7 @@
 [  90%] 05-24 - Deep Learning Group project (20%)
 [ 100%] 05-26 - Financial Econometrics - Project presentation (20%)
 [   0%] 05-27 - Functional Data Analysis - Final project presentation (20%)
-[  20%] 05-31 - Big Data Analysis Group project (20%)
+[  80%] 05-31 - Big Data Analysis Group project (20%)
 [   5%] 06-19 - Big Data Analysis Individual project (20%)
 
 [exam!] 06-09 - Functional Data Analysis exam (50%)
