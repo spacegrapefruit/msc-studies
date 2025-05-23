@@ -1,2 +1,5 @@
 pyspark==3.5.5
 pyyaml==6.0.2
+pandas==2.2.3
+folium==0.19.6
+scikit-learn==1.6.1
