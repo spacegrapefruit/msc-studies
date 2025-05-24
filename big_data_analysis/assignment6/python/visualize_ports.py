@@ -63,7 +63,7 @@ def create_port_visualization_map(
                 location=port_loc,
                 radius=radius,
                 popup=folium.Popup(popup_html, max_width=300),
-                color="purple",  # Changed color to distinguish from grid-based
+                color="purple",
                 fill=True,
                 fill_color="mediumpurple",
                 fill_opacity=0.6,
@@ -71,12 +71,14 @@ def create_port_visualization_map(
             ).add_to(ports_group)
 
             # To visualize DBSCAN cluster shapes, you'd typically plot the convex hull of points_in_cluster
-            # or plot all individual points of the cluster. This is more advanced.
-            # If 'member_points' were added to port_summary_list and ports_df_pandas:
-            # if 'member_points' in port and port['member_points']:
-            #     points_feature_group = folium.FeatureGroup(name=f"Port {port['port_id']} Points", show=False).add_to(ports_group)
-            #     for p_point in port['member_points']:
-            #         folium.CircleMarker([p_point['Latitude'], p_point['Longitude']], radius=1, color='red').add_to(points_feature_group)
+            # or plot all individual points of the cluster.
+            # points_feature_group = folium.FeatureGroup(
+            #     name=f"Port {port['port_id']} Points", show=False
+            # ).add_to(ports_group)
+            # for p_point in port["member_points"]:
+            #     folium.CircleMarker(
+            #         [p_point["Latitude"], p_point["Longitude"]], radius=1, color="red"
+            #     ).add_to(points_feature_group)
 
     folium.LayerControl().add_to(m)
     m.save(output_filename)

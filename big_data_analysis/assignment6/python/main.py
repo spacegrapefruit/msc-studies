@@ -1,18 +1,31 @@
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
+from pyspark.sql import SparkSession
+
 from config import Config
-from spark_session_manager import get_spark_session
 from data_loader_and_schema import get_ais_schema, load_data
 from filtering_operations import filter_and_prepare_data
 from port_detection_logic import detect_ports_dbscan
 from port_sizing_logic import evaluate_relative_port_size
 from visualize_ports import create_port_visualization_map
 
-# For collecting limited data for visualization (set to None to collect all)
-# This is useful if the filtered_df is very large, to avoid OOM on driver for heatmap
-MAX_POINTS_FOR_HEATMAP = 200000
+
+def get_spark_session(app_name="AISPortDetection"):
+    spark_builder = (
+        SparkSession.builder.appName(app_name)
+        .config("spark.driver.memory", "4g")
+        .config("spark.executor.memory", "2g")
+        .config("spark.sql.shuffle.partitions", "50")
+        .master("local[*]")
+    )  # Use all available cores locally
+
+    spark = spark_builder.getOrCreate()
+    logging.info("SparkSession created successfully.")
+
+    return spark
 
 
 if __name__ == "__main__":
@@ -62,23 +75,21 @@ if __name__ == "__main__":
         ports_for_viz_pd = sized_ports_df.toPandas()
 
         # Collect a sample of filtered (slow) points for heatmap background
-        filtered_points_for_heatmap_pd = pd.DataFrame()
-        if filtered_df.count() > 0:
-            if MAX_POINTS_FOR_HEATMAP and filtered_df.count() > MAX_POINTS_FOR_HEATMAP:
-                logging.info(
-                    f"Sampling {MAX_POINTS_FOR_HEATMAP} points from filtered data for heatmap background..."
-                )
-                sample_fraction = MAX_POINTS_FOR_HEATMAP / filtered_df.count()
-                filtered_points_for_heatmap_pd = (
-                    filtered_df.select("Latitude", "Longitude")
-                    .sample(withReplacement=False, fraction=sample_fraction, seed=42)
-                    .toPandas()
-                )
-            else:
-                logging.info("Collecting all filtered points for heatmap background...")
-                filtered_points_for_heatmap_pd = filtered_df.select(
-                    "Latitude", "Longitude"
-                ).toPandas()
+        if filtered_df.count() > config.max_points_for_heatmap:
+            logging.info(
+                f"Sampling {config.max_points_for_heatmap} points from filtered data for heatmap background..."
+            )
+            sample_fraction = config.max_points_for_heatmap / filtered_df.count()
+            filtered_points_for_heatmap_pd = (
+                filtered_df.select("Latitude", "Longitude")
+                .sample(withReplacement=False, fraction=sample_fraction, seed=42)
+                .toPandas()
+            )
+        else:
+            logging.info("Collecting all filtered points for heatmap background...")
+            filtered_points_for_heatmap_pd = filtered_df.select(
+                "Latitude", "Longitude"
+            ).toPandas()
 
         create_port_visualization_map(
             ports_for_viz_pd,

@@ -11,9 +11,9 @@ from pyspark.sql.types import (
     ArrayType,
     LongType,
 )
-from utils import EARTH_RADIUS_KM
 
 # Parameters for DBSCAN
+EARTH_RADIUS_KM = 6_371
 DBSCAN_EPS_KM = 1  # 1000 meters
 DBSCAN_MIN_SAMPLES = 15
 MIN_UNIQUE_VESSELS_PER_PORT = 5
@@ -126,7 +126,9 @@ def detect_ports_dbscan(filtered_df, spark_session):
                 "center_lon": center_lon,
                 "num_signals": num_signals,
                 "num_unique_vessels": num_unique_vessels,
-                # "member_points": current_cluster_points[['Latitude', 'Longitude']].to_dict(orient='records') # Optional
+                # "member_points": current_cluster_points[
+                #     ["Latitude", "Longitude"]
+                # ].to_dict(orient="records"),
             }
         )
 
