@@ -232,6 +232,10 @@ lambdas_t_vec <- 10^seq(-5, 0, length.out = 11)
 gcv_matrix <- matrix(NA, nrow = length(lambdas_s_vec), ncol = length(lambdas_t_vec),
                      dimnames = list(paste0("s_", lambdas_s_vec), paste0("t_", lambdas_t_vec)))
 
+# TODO bibasis does not work! this is a workaround
+source(file.path(root_dir, "notebooks/bibasis_functions.R"))
+defaultnames <- list("argument s", "argument t", "function")
+
 for (i in seq_along(lambdas_s_vec)) {
   fdPar_s_2d <- fdPar(basis_day, Lfdobj = 2, lambda = lambdas_s_vec[i])
   cat("Processing lambda_s =", lambdas_s_vec[i], "\n")
@@ -524,10 +528,11 @@ ggsave(file.path(params$output_dir, "figures/fpca_scores_pc1_pc2_city_avg.png"),
 ```{r fpca_map_visualization, warning=FALSE, message=FALSE}
 city_coords <- tibble(
   # Bengaluru, Bombay, Delhi, Hyderabad, Jaipur, Kanpur, Nagpur, Pune
-  City = city_coords$City,
+  City = city_names,
   latitude = c(13.0, 19.1, 28.6, 17.4, 26.9, 26.5, 21.1, 18.5),
   longitude = c(77.6, 72.9, 77.2, 78.5, 75.8, 80.3, 79.1, 73.9)
 )
+print(city_coords)
 
 # merge coordinates with FPCA scores
 fpca_map_data <- fpca_scores_city_avg %>%
@@ -857,6 +862,7 @@ for (i in 1:num_days) {
     
     # perform ANOVA
     res_aov <- aov(temperature ~ cluster, data = anova_df)
+    p_value_matrix[i, j] <- summary(res_aov)[[1]][["Pr(>F)"]][1]  # Extract p-value for the cluster effect
   }
 }
 cat("Pointwise ANOVA completed.\n")
