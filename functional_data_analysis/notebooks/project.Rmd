@@ -335,8 +335,8 @@ ggplot(smoothed_midday_df, aes(x = day_of_year_fine, y = tempC, color = City)) +
 ggsave(file.path(params$output_dir, "figures/smoothed_midday_temperature_curves.png"), width = 10, height = 6)
 
 # mean absolute error between smoothed and original data
-printf("Mean Absolute Error between smoothed and original data for %s: %.2f °C",
-       mean(abs(Y_smoothed_city_avg_grid - Y)))
+print("Mean Absolute Error between smoothed and original data:")
+print(mean(abs(Y_smoothed_city_avg_grid - Y)))
 ```
 
 ## Derivatives Heatmaps (City Averages)
@@ -893,132 +893,131 @@ print(p_pointwise_anova)
 ggsave(file.path(params$output_dir, "figures/pointwise_anova_clusters_heatmap.png"), p_pointwise_anova, width = 9, height = 6)
 ```
 
-## Functional Time Series Modeling and Forecasting
+## Functional Regression Modeling
 
-We'll select one cluster and model how its daily mean temperature profile (averaged over hours) evolves across the years 2011-2018.
-
-```{r functional_time_series_modeling}
-# data preparation
-
-# cdd cluster information to the yearly data scores
-city_year_cluster_info <- scores_data_yearly %>%
-  left_join(scores_df_city_avg_clustered %>% select(City, Cluster), by = "City")
-
-# model Cluster 1
-target_cluster_id <- 1 
-target_cluster_cities <- scores_df_city_avg_clustered %>% 
-  filter(Cluster == target_cluster_id) %>% 
-  pull(City)
-
-cat("Selected Cluster for FTS:", target_cluster_id, "\n")
-cat("Cities in Cluster", target_cluster_id, ":", paste(target_cluster_cities, collapse=", "), "\n")
-
-years_for_fts <- 2011:2018
-num_years_fts <- length(years_for_fts)
-
-# matrix to store the annual mean daily temperature profiles for the cluster
-# rows: days of the year (s_grid), Columns: years
-cluster_annual_profiles_smoothed <- matrix(
-  NA,
-  nrow = length(s_grid),
-  ncol = num_years_fts,
-  dimnames = list(as.character(s_grid), as.character(years_for_fts))
-)
-
-cat("Preparing annual mean daily temperature profiles for Cluster", target_cluster_id, "...\n")
-for (current_year in years_for_fts) {
-  current_year_labels_in_cluster <- city_year_cluster_info %>%
-    filter(Year == current_year, Cluster == target_cluster_id) %>%
-    pull(Label)
-
-  # get indices of these city-year surfaces in the coefficient array of bifd_obj_yearly
-  indices_in_coef_array <- which(city_year_labels %in% current_year_labels_in_cluster)
+```{r regression_modeling}
+# # helper function to extract univariate functional data for a specific hour
+# extract_hourly_fd <- function(Y_smoothed_array, target_hour_str, s_grid_vals, day_basis, city_names_vec) {
+#   # find the index for the target hour (dimnames are characters)
+#   hour_idx <- which(dimnames(Y_smoothed_array)[[2]] == target_hour_str)
+#   data_matrix <- Y_smoothed_array[, hour_idx, ] 
   
-  # calculate the mean coefficient matrix for this cluster and year
-  mean_coefs_cluster_year <- apply(
-    bifd_obj_yearly$coefs[, , indices_in_coef_array, drop = FALSE],
-    c(1, 2), # Average over the 1st (day basis) and 2nd (hour basis) dimensions
-    mean,
-    na.rm = TRUE
-  )
+#   fd_obj <- Data2fd(argvals = s_grid_vals, y = data_matrix, basisobj = day_basis)
   
-  # create a bifd object for the mean surface of this cluster-year
-  mean_surf_cluster_year_bifd <- bifd(
-    coef = mean_coefs_cluster_year,
-    sbasisobj = basis_day,
-    tbasisobj = basis_hour
-  )
+#   # assign meaningful names
+#   fd_obj$fdnames$reps <- city_names_vec
+#   fd_obj$fdnames$time <- "Day of Year"
+#   fd_obj$fdnames$values <- paste("Temperature at", target_hour_str, "H")
   
-  # evaluate this mean surface on the s_grid (days) and t_grid (hours)
-  evaluated_surf_cluster_year <- eval.bifd(s_grid, t_grid, mean_surf_cluster_year_bifd)
+#   return(fd_obj)
+# }
+
+# # midday (12:00) temperature curves as response
+# midday_temp_fd <- extract_hourly_fd(
+#   Y_smoothed_city_avg_grid, 
+#   target_hour_str = "12", 
+#   s_grid_vals = s_grid, 
+#   day_basis = basis_day, 
+#   city_names_vec = city_names
+# )
+
+# # midnight (00:00) temperature curves as predictor
+# midnight_temp_fd <- extract_hourly_fd(
+#   Y_smoothed_city_avg_grid, 
+#   target_hour_str = "0", 
+#   s_grid_vals = s_grid, 
+#   day_basis = basis_day, 
+#   city_names_vec = city_names
+# )
+
+# cat("Dimensions of midday_temp_fd coefficients:", dim(midday_temp_fd$coefs), "\n")
+# cat("Dimensions of midnight_temp_fd coefficients:", dim(midnight_temp_fd$coefs), "\n")
+
+# # define fdPar for the intercept function
+# lambda_alpha <- 1e0
+# fdPar_alpha <- fdPar(basis_day, Lfdobj = 2, lambda = lambda_alpha)
+
+# # define fdPar for the bivariate coefficient function
+# # basis_day %x% basis_day creates a bivariate basis object (class bifd)
+# bifd_basis_beta <- kronecker.prod(basis_day, basis_day)
+# lambda_beta <- 1e2
+# # Lfdobj=2 applies 2nd derivative penalty to both dimensions of the tensor product basis
+# fdPar_beta <- fdPar(bifd_basis_beta, Lfdobj = 2, lambda = lambda_beta)
+
+# # prepare lists for fRegress
+# # for the intercept: a constant functional covariate (matrix of 1s)
+# const_covariate_data <- matrix(1, nrow = 1, ncol = dim(midday_temp_fd$coefs)[2])
+# const_basis <- create.constant.basis(range(s_grid)) # A basis for a constant
+# const_fd <- fd(coef = const_covariate_data, basisobj = const_basis)
+
+# xfdlist <- list(const = const_fd, midnight = midnight_temp_fd)
+# betalist <- list(const = fdPar_alpha, midnight = fdPar_beta)
+
+# # fit the function-on-function regression model
+# # the response midday_temp_fd is passed to yfdPar
+# fRegress_model_fof <- fda::fRegress(
+#   y = midday_temp_fd, 
+#   xfdlist = xfdlist, 
+#   betalist = betalist
+# )
+
+# cat("\nFunctional R-squared for the model:\n")
+# # R2 can be directly accessed from the model object if yfdPar was an fd object
+# print(fRegress_model_fof$R2)
+
+# # extract the estimated functions from the model
+# alpha_hat_fd <- fRegress_model_fof$betaestlist$const$fd
+
+# plot(alpha_hat_fd, 
+#      xlab = "Day of Year (s_Y)", ylab = "Temperature (°C)",
+#      main = "Estimated Intercept Function alpha_hat(s_Y)\n(Baseline Midday Temperature Cycle)",
+#      col = "blue", lwd = 2)
+# abline(h=0, lty=2, col="gray")
+
+
+
+# beta_hat_bifd <- fRegress_model_fof$betaestlist$midnight$fd
+
+# # Plot as a contour plot
+# plot(beta_hat_bifd, 
+#      xlab = "Day of Year for Midnight Temp (s_X)", 
+#      ylab = "Day of Year for Midday Temp (s_Y)",
+#      main = "Estimated Coefficient Surface beta_hat(s_Y, s_X)",
+#      zlab ="Coefficient Value", # For persp plots if used
+#      # nlevels for contour, or theta/phi for persp
+#      # Example using default plot.bifd which might be persp or contour
+#      )
+# title(sub = "Influence of Midnight Temp (s_X) on Midday Temp (s_Y)")     
+
+# # For a clearer contour plot if the default is not ideal:
+# # s_fine_grid <- seq(1, 365, length.out = 50)
+# # beta_eval_fine <- eval.bifd(s_fine_grid, s_fine_grid, beta_hat_bifd)
+# # contour(x=s_fine_grid, y=s_fine_grid, z=beta_eval_fine,
+# #         xlab = "Day of Year for Midnight Temp (s_X)",
+# #         ylab = "Day of Year for Midday Temp (s_Y)",
+# #         main = "Contour Plot of beta_hat(s_Y, s_X)",
+# #         nlevels=15, drawlabels=TRUE, col="darkblue")
+# # abline(0,1, lty=2, col="red") # s_Y = s_X line for reference
+
+
+# # Get predicted midday temperature curves
+# midday_temp_pred_fd <- fRegress_model_fof$yhatfdobj$fd
+
+# # Choose a few cities to plot (e.g., the first few or specific ones)
+# cities_to_plot_indices <- 1:min(3, length(city_names)) # Plot for first 3 cities
+
+# # Create a layout for multiple plots
+# par(mfrow = c(length(cities_to_plot_indices), 1), mar = c(4,4,2,1))
+
+# for (idx in cities_to_plot_indices) {
+#   city_name_current <- city_names[idx]
   
-  # to get the mean daily temperature profile, average over the hours (t_grid, which is the 2nd dimension of evaluated_surf_cluster_year)
-  daily_profile_cluster_year <- apply(evaluated_surf_cluster_year, 1, mean, na.rm = TRUE)
-  
-  cluster_annual_profiles_smoothed[, as.character(current_year)] <- daily_profile_cluster_year
-}
-cat("Finished preparing annual profiles.\n")
-
-# FTS modeling and forecasting
-
-# each row is a point on the functional curve (day of year).
-fts_cluster_data <- fts(
-  x = s_grid,
-  y = cluster_annual_profiles_smoothed,
-  start = min(years_for_fts),
-  frequency = 1,
-  xname = "Mean Daily Temperature Profile",
-  yname = "Day of Year"
-)
-
-p_fts_data <- ggplot(data = fts_cluster_data, aes(x = x, y = y)) +
-  # geom_line(aes(group = rownames(fts_cluster_data)), color = "grey", alpha = 0.5) +
-  geom_line(stat = "summary", fun = "mean", color = "blue", size = 1.2) +
-  labs(
-    title = paste("Mean Daily Temperature Profiles - Cluster", target_cluster_id),
-    x = "Day of Year",
-    y = "Mean Temperature (°C)"
-  ) +
-  theme_minimal()
-
-# plot the functional time series
-plot_file_fts_data <- file.path(params$output_dir, paste0("figures/fts_cluster", target_cluster_id, "_profiles.png"))
-png(plot_file_fts_data, width = 800, height = 600)
-plot(fts_cluster_data, 
-      main = paste("Annual Mean Daily Temperature Profiles - Cluster", target_cluster_id),
-      xlab = "Day of Year", ylab = "Mean Temperature (°C)")
-dev.off()
-cat("Plotted FTS data to:", plot_file_fts_data, "\n")
-
-num_pcs_fts <- 3
-cat("Fitting FTS model with", num_pcs_fts, "principal components...\n")
-model_fts_cluster <- ftsm(y = fts_cluster_data, order = num_pcs_fts, method = "classical")
-
-print(model_fts_cluster)
-cat("Variance explained by PCs:", model_fts_cluster$varprop, "\n")
-
-# plot model components (mean function and eigenfunctions)
-plot_file_fts_model <- file.path(params$output_dir, paste0("figures/fts_cluster",target_cluster_id,"_model.png"))
-png(plot_file_fts_model, width = 900, height = 700)
-plot(model_fts_cluster, main_title = paste("FTS Model Components - Cluster", target_cluster_id))
-dev.off()
-cat("Plotted FTS model components to:", plot_file_fts_model, "\n")
-
-# forecast for the next year (2019)
-cat("Forecasting 1 year ahead...\n")
-forecast_fts_cluster <- forecast(model_fts_cluster, h = 1, level = 95)
-
-# plot the forecast
-plot_file_fts_forecast <- file.path(params$output_dir, paste0("figures/fts_cluster",target_cluster_id,"_forecast.png"))
-png(plot_file_fts_forecast, width = 800, height = 600)
-plot(
-  forecast_fts_cluster,
-  main = paste("Forecast of Mean Daily Temperature Profile - Cluster", target_cluster_id, "for", max(years_for_fts)+1),
-  xlab = "Day of Year",
-  ylab = "Mean Temperature (°C)"
-)
-legend("topleft", legend=c("Historical Data", "Forecast Mean", "80% PI", "95% PI"), 
-        col=c("grey", "blue", "lightblue", "lightcyan"), lty=c(1,1,2,2), lwd=c(1,2,1,1), cex=0.8)
-dev.off()
-cat("Plotted FTS forecast to:", plot_file_fts_forecast, "\n")
+#   plot(midday_temp_fd[idx], col = "black", lwd = 2, lty = 1,
+#        xlab = "Day of Year", ylab = "Temperature (°C)",
+#        ylim = range(c(eval.fd(s_grid, midday_temp_fd[idx]), eval.fd(s_grid, midday_temp_pred_fd[idx]))),
+#        main = paste("Midday Temperature: Actual vs. Predicted -", city_name_current))
+#   lines(midday_temp_pred_fd[idx], col = "red", lwd = 2, lty = 2)
+#   legend("topright", legend = c("Actual", "Predicted"), col = c("black", "red"), lty = c(1,2), lwd=2, cex=0.8)
+# }
+# par(mfrow = c(1,1)) # Reset layout
 ```
