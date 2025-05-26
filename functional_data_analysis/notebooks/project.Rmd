@@ -1,0 +1,1029 @@
+---
+title: "EDA and Functional Data Analysis of Weather Data"
+author: "Aleksandr J. Smoliakov"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+root_dir <- "/home/aleks/msc-studies/functional_data_analysis"
+params <- list(
+  input_dir = file.path(root_dir, "data/input"),
+  output_dir = file.path(root_dir, "data/output")
+)
+
+# Global setup
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.path = file.path(params$output_dir, "figures/"),
+  fig.width = 8,
+  fig.height = 5
+)
+```
+
+## Libraries
+
+For this analysis, we will use the following libraries:
+
+```{r libraries}
+library(fda)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(stringr)
+library(fs)
+library(abind)
+library(purrr)
+
+library(sf)
+library(rnaturalearth)
+library(fda.usc)
+library(ggrepel)
+library(ftsa)
+library(fdANOVA)
+```
+
+## Helper Functions
+
+Some helper functions for loading data and plotting heatmaps.
+
+```{r helpers}
+# Load and combine weather data
+load_weather_data <- function(path) {
+  files <- dir_ls(path, regexp = "\\.csv$")
+  df_list <- lapply(files, function(f) {
+    city <- path_ext_remove(path_file(f)) %>% str_to_title()
+    read_csv(f, show_col_types = FALSE) %>%
+      select(date_time, tempC) %>%
+      filter(year(date_time) %in% 2011:2018) %>%
+      mutate(City = city)
+  })
+  bind_rows(df_list)
+}
+
+# Plot heatmap for slopes/derivatives
+plot_heatmap_slope <- function(slope_matrix, title, days_vec, hours_vec, force_center = TRUE, value_range = NULL) {
+  slope_df <- data.frame(
+    day = rep(days_vec, each = length(hours_vec)),
+    hour = rep(hours_vec, times = length(days_vec)),
+    value = as.vector(slope_matrix %>% t())
+  )
+
+  if (force_center) {
+    # Center the color scale around 0
+    value_limit <- quantile(abs(slope_df$value), 0.98) * 1.2
+    value_range <- c(-value_limit, value_limit)
+  }
+  if (!is.null(value_range)) {
+    slope_df$value <- pmin(pmax(slope_df$value, value_range[1]), value_range[2])
+  }
+
+  ggplot(slope_df, aes(x = day, y = hour, fill = value)) +
+    geom_tile() +
+    scale_fill_gradientn(
+      colors = c("blue", "white", "red"),
+      limits = value_range,
+      name = "Value"
+    ) +
+    labs(title = title, x = "Day of Year", y = "Hour of Day") +
+    theme_minimal()
+}
+```
+
+## Load and Preprocess Data
+
+We will load the weather data, clean it, and augment it with additional time-based features.
+
+```{r load-preprocess}
+# Read raw data
+suppressMessages(
+  data_weather_raw <- load_weather_data(params$input_dir)
+)
+
+# Clean and augment
+data_weather <- data_weather_raw %>%
+  mutate(
+    date_time   = as_datetime(date_time),
+    date        = as.Date(date_time),
+    day_of_year = yday(date_time),
+    hour_of_day = hour(date_time),
+    year        = year(date_time)
+  ) %>%
+  filter(!(month(date_time) == 2 & day(date_time) == 29)) %>%
+  # Adjust day_of_year for leap years
+  group_by(year) %>%
+  mutate(
+    day_of_year = if_else(leap_year(year) & month(date_time) > 2,
+      day_of_year - 1,
+      day_of_year
+    )
+  ) %>%
+  ungroup()
+
+# Summary
+data_weather %>% glimpse()
+```
+
+## Preprocessing for Functional Data Analysis
+
+We will convert the data into a format suitable for functional data analysis, averaging multi-year temperatures by city, day of year, and hour of day.
+
+```{r preprocess-fda}
+# Convert to daily + hourly data by averaging temperature for each city, day_of_year, and hour_of_day
+average_hourly_data <- data_weather %>%
+  group_by(City, day_of_year, hour_of_day) %>%
+  summarise(
+    tempC = mean(tempC, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(City, day_of_year, hour_of_day)
+
+average_hourly_data %>% glimpse()
+```
+
+## Exploratory Data Analysis: Unsmoothed Temperature Curves
+
+```{r unsmoothed_plots}
+# Plot unsmoothed temperature curves for each city
+average_hourly_data %>%
+  filter(hour_of_day == 12) %>% # Use midday temperature for clarity
+  ggplot(aes(x = day_of_year, y = tempC, color = City)) +
+  geom_line(alpha = 0.8) +
+  labs(
+    title = "Average Midday Temperature Curves by City (2011-2018)",
+    x = "Day of Year",
+    y = "Temperature (°C)"
+  ) +
+  theme_minimal()
+
+plot_file_unsmoothed <- file.path(params$output_dir, "figures/unsmoothed_temperature_curves.png")
+ggsave(plot_file_unsmoothed, width = 10, height = 6)
+```
+
+## Prepare Data for Functional Analysis
+
+Now we will prepare the data for functional analysis by creating a 3D array where each slice corresponds to a city, and each entry is the temperature for a specific day and hour.
+
+```{r prepare_matrix_city_avg}
+# Create a 3D array [day, hour, city] for city-average data
+days <- 1:365
+hours <- 0:23
+
+# Build 365 x 24 x n_cities matrix of average temperatures
+temp_matrices_city_avg <- average_hourly_data %>%
+  select(City, day_of_year, hour_of_day, tempC) %>%
+  pivot_wider(
+    names_from = hour_of_day,
+    values_from = tempC,
+    names_prefix = "h"
+  ) %>%
+  arrange(City, day_of_year)
+
+city_list_for_Y <- temp_matrices_city_avg %>%
+  split(~City) %>%
+  map(~ select(.x, starts_with("h")) %>% as.matrix())
+
+# Get city names in the order they appear in the list
+city_names <- names(city_list_for_Y)
+
+Y <- abind(city_list_for_Y, along = 3)
+dimnames(Y) <- list(
+  day = as.character(days),
+  hour = as.character(hours),
+  city = city_names
+)
+
+cat("Dimensions of Y (city-average data) [day, hour, city]:", dim(Y), "\n")
+```
+
+## Basis Functions and Lambda Selection
+
+We will define the basis functions for the day and hour dimensions, and then select optimal smoothing parameters (lambdas) using Generalized Cross-Validation (GCV).
+
+```{r basis_and_lambda}
+# Define bases
+# Annual cycle basis (period = 365 days)
+basis_day <- create.bspline.basis(
+  rangeval = c(1, 365),
+  nbasis = 12
+)
+
+# Daily cycle basis (period = 24 hours)
+basis_hour <- create.fourier.basis(
+  rangeval = c(0, 23),
+  nbasis = 11, # 5 harmonics + intercept
+  period = 24
+)
+
+# Grid values
+s_grid <- days
+t_grid <- hours
+
+# Range of smoothing parameters
+lambdas_s_vec <- 10^seq(-3, 2, length.out = 11)
+lambdas_t_vec <- 10^seq(-5, 0, length.out = 11)
+gcv_matrix <- matrix(NA, nrow = length(lambdas_s_vec), ncol = length(lambdas_t_vec),
+                     dimnames = list(paste0("s_", lambdas_s_vec), paste0("t_", lambdas_t_vec)))
+
+for (i in seq_along(lambdas_s_vec)) {
+  fdPar_s_2d <- fdPar(basis_day, Lfdobj = 2, lambda = lambdas_s_vec[i])
+  cat("Processing lambda_s =", lambdas_s_vec[i], "\n")
+  for (j in seq_along(lambdas_t_vec)) {
+    fdPar_t_2d <- fdPar(basis_hour, Lfdobj = 2, lambda = lambdas_t_vec[j])
+    surf_res_2d <- smooth.bibasis(s_grid, t_grid, Y, fdPar_s_2d, fdPar_t_2d)
+    gcv_matrix[i, j] <- sum(surf_res_2d$gcv)
+  }
+}
+
+# Find indices of min GCV
+min_idx_2d <- which(gcv_matrix == min(gcv_matrix, na.rm = TRUE), arr.ind = TRUE)
+lambda_s_opt_2d <- lambdas_s_vec[min_idx_2d[1]]
+lambda_t_opt_2d <- lambdas_t_vec[min_idx_2d[2]]
+cat("Optimal 2D GCV: lambda_s =", lambda_s_opt_2d, ", lambda_t =", lambda_t_opt_2d, "\n")
+
+# Visualization of 2D GCV surface (using persp or ggplot with geom_tile)
+gcv_df_2d <- as.data.frame(as.table(gcv_matrix))
+names(gcv_df_2d) <- c("lambda_s_label", "lambda_t_label", "GCV")
+gcv_df_2d$lambda_s <- lambdas_s_vec[as.integer(factor(gcv_df_2d$lambda_s_label))]
+gcv_df_2d$lambda_t <- lambdas_t_vec[as.integer(factor(gcv_df_2d$lambda_t_label))]
+
+ggplot(gcv_df_2d, aes(x = log10(lambda_s), y = log10(lambda_t), fill = GCV)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "C") +
+  labs(title = "2D GCV Surface for λs and λt", x = "log10(λs)", y = "log10(λt)") +
+  theme_minimal()
+
+# save the plot
+ggsave(file.path(params$output_dir, "figures/gcv_surface_2d.png"), width = 8, height = 6)
+```
+
+## Bivariate Smoothing and Visualization
+
+In this section, we will smooth the city-average data using the optimal lambda values found earlier and visualize the results.
+
+```{r smoothing_and_plot_city_avg}
+# Smooth with optimal lambda_s and lambda_t
+fdPar_s_opt <- fdPar(basis_day, Lfdobj = 2, lambda = lambda_s_opt_2d)
+fdPar_t_opt <- fdPar(basis_hour, Lfdobj = 2, lambda = lambda_t_opt_2d)
+
+# Smooth over the rectangular day x hour lattice for city-average data Y
+res_city_avg <- smooth.bibasis(s_grid, t_grid, Y, fdPar_s_opt, fdPar_t_opt)
+bifd_obj_city_avg <- res_city_avg$bifdobj # This is the bivariate functional data object for city averages
+
+# Evaluate on fine grid for plotting
+s_fine <- seq(1, 365, length.out = 100) # Finer grid for day
+t_fine <- seq(0, 23, length.out = 97) # Finer grid for hour (every 15 mins)
+
+# Y_smoothed_city_avg_fine will be an array [s_fine, t_fine, n_cities]
+Y_smoothed_city_avg_fine <- eval.bifd(s_fine, t_fine, bifd_obj_city_avg)
+# Y_smoothed_city_avg_grid will be an array [s_grid, t_grid, n_cities] for comparison with original
+Y_smoothed_city_avg_grid <- eval.bifd(s_grid, t_grid, bifd_obj_city_avg)
+dimnames(Y_smoothed_city_avg_grid) <- list(
+  day = as.character(s_grid),
+  hour = as.character(t_grid),
+  city = dimnames(Y)[[3]]
+)
+
+# Plot the smoothed values for a specific city (the first city)
+city_idx_to_plot <- 1
+city_name_to_plot <- dimnames(Y_smoothed_city_avg_grid)[[3]][city_idx_to_plot]
+
+# Example comparing raw and smoothed for a slice of days (days 150-170) at all hours
+days_slice <- 150:170
+raw_slice <- Y[days_slice, , city_idx_to_plot]
+smoothed_slice <- Y_smoothed_city_avg_grid[days_slice, , city_idx_to_plot]
+
+matplot(t_grid, t(raw_slice),
+  type = "p", pch = ".", col = "red", cex = 2.5,
+  xlab = "Hour of Day", ylab = "Temperature (°C)",
+  main = paste(
+    "Raw (Red) vs. Smoothed (Black) Temperature Profiles",
+    "\nCity:", city_name_to_plot, "- Days:", min(days_slice), "-", max(days_slice)
+  )
+)
+matlines(t_grid, t(smoothed_slice), type = "l", col = "black", lty = 1)
+legend("topright", legend = c("Raw Data Points", "Smoothed Curves"), col = c("red", "black"), pch = c(".", NA), lty = c(NA, 1), cex = 0.8)
+
+# Save the plot
+plot_file_smoothed <- file.path(params$output_dir, "figures/smoothed_temperature_curves_city_avg.png")
+ggsave(plot_file_smoothed, width = 10, height = 6)
+
+# Plot smoothed midday temperature curves for all cities
+smoothed_midday_df <- as.data.frame.table(Y_smoothed_city_avg_fine[, which.min(abs(t_fine - 12)), ], responseName = "tempC") %>%
+  rename(day_of_year_fine = Var1, City = Var2) %>%
+  mutate(day_of_year_fine = s_fine[as.numeric(day_of_year_fine)])
+
+ggplot(smoothed_midday_df, aes(x = day_of_year_fine, y = tempC, color = City)) +
+  geom_line() +
+  labs(
+    title = "Smoothed Midday Temperature Curves by City",
+    subtitle = paste("λs =", formatC(lambda_s_opt_2d, format = "e", digits = 2), ", λt =", lambda_t_opt_2d),
+    x = "Day of Year (fine grid)", y = "Temperature (°C)"
+  ) +
+  theme_minimal()
+ggsave(file.path(params$output_dir, "figures/smoothed_midday_temperature_curves.png"), width = 10, height = 6)
+
+# Mean absolute error between smoothed and original data
+mean(abs(Y_smoothed_city_avg_grid - Y))
+```
+
+## Derivatives Heatmaps (City Averages)
+
+```{r derivatives_heatmaps_city_avg}
+# Derivatives w.r.t. day (s) for the first city
+slope_day <- eval.bifd(s_grid, t_grid, bifd_obj_city_avg, sLfdobj = 1, tLfdobj = 0)
+accel_day <- eval.bifd(s_grid, t_grid, bifd_obj_city_avg, sLfdobj = 2, tLfdobj = 0)
+
+# Derivatives w.r.t. hour (t) for the first city
+slope_hour <- eval.bifd(s_grid, t_grid, bifd_obj_city_avg, sLfdobj = 0, tLfdobj = 1)
+accel_hour <- eval.bifd(s_grid, t_grid, bifd_obj_city_avg, sLfdobj = 0, tLfdobj = 2)
+
+# Plot heatmaps
+p_der_s1 <- plot_heatmap_slope(
+  slope_day[, , city_idx_to_plot],
+  title = paste("Daily Rate of Change -", city_name_to_plot),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_der_s1)
+ggsave(file.path(params$output_dir, "figures/derivative_day1_city_avg.png"), p_der_s1, width = 8, height = 5)
+
+p_der_s2 <- plot_heatmap_slope(
+  accel_day[, , city_idx_to_plot],
+  title = paste("Daily Acceleration -", city_name_to_plot),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_der_s2)
+ggsave(file.path(params$output_dir, "figures/derivative_day2_city_avg.png"), p_der_s2, width = 8, height = 5)
+
+p_der_t1 <- plot_heatmap_slope(
+  slope_hour[, , city_idx_to_plot],
+  title = paste("Hourly Rate of Change -", city_name_to_plot),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_der_t1)
+ggsave(file.path(params$output_dir, "figures/derivative_hour1_city_avg.png"), p_der_t1, width = 8, height = 5)
+
+p_der_t2 <- plot_heatmap_slope(
+  accel_hour[, , city_idx_to_plot],
+  title = paste("Hourly Acceleration -", city_name_to_plot),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_der_t2)
+ggsave(file.path(params$output_dir, "figures/derivative_hour2_city_avg.png"), p_der_t2, width = 8, height = 5)
+```
+
+## Covariance Analysis and Heatmap
+
+This section analyzes the covariance of hourly temperatures, treating days as replicates for a chosen city.
+
+```{r covariance-heatmap_city_avg}
+# Use the smoothed data for one city (city_idx_to_plot)
+# daily_mat_smoothed is 24 hours (rows) x 365 days (cols)
+daily_mat_smoothed <- t(Y_smoothed_city_avg_grid[, , city_idx_to_plot])
+
+# Create a univariate functional data object for hourly temperature profiles,
+# where each day is a replicate.
+# argvals are hours (0-23), y is the matrix (hours x days)
+hourly_fd_city1 <- Data2fd(
+  argvals  = hours,
+  y        = daily_mat_smoothed,
+  basisobj = basis_hour # Fourier basis for hours
+)
+
+# Compute covariance function var.fd(fdobj) returns a bivariate fd object
+cov_bifd_hourly <- var.fd(hourly_fd_city1)
+
+# Evaluate covariance surface on a fine grid of hours
+cov_mat_eval <- eval.bifd(t_fine, t_fine, cov_bifd_hourly)
+
+cov_df_plot <- expand.grid(hour1 = t_fine, hour2 = t_fine) %>%
+  mutate(covariance = as.vector(cov_mat_eval))
+
+p_cov_hourly <- ggplot(cov_df_plot, aes(x = hour1, y = hour2, fill = covariance)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "midnightblue", mid = "white", high = "firebrick",
+    midpoint = mean(range(cov_df_plot$covariance, na.rm = TRUE)),
+    name = "Covariance"
+  ) +
+  labs(
+    title = paste("Covariance of Hourly Temperatures -", city_name_to_plot),
+    subtitle = "Days (smoothed) treated as replicates",
+    x = "Hour of Day (t1)",
+    y = "Hour of Day (t2)"
+  ) +
+  coord_fixed() +
+  theme_minimal()
+
+print(p_cov_hourly)
+ggsave(file.path(params$output_dir, "figures/covariance_heatmap_hourly_city_avg.png"), p_cov_hourly, width = 7, height = 6)
+```
+
+## Functional Principal Component Analysis (FPCA) on City Averages
+
+We will perform FPCA on the bivariate functional data object created from the city-average temperature surfaces. The coefficients of the smoothed surfaces will be used as replicates.
+
+```{r fpca_analysis_city_avg}
+# FPCA on the bivariate functional data object for city averages (bifd_obj_city_avg)
+# The "replicates" are the different cities.
+
+# Extract coefficients: array [nbasis_day, nbasis_hour, n_cities]
+coef_arr_city_avg <- bifd_obj_city_avg$coefs
+nb_s <- dim(coef_arr_city_avg)[1]
+nb_t <- dim(coef_arr_city_avg)[2]
+n_cities <- dim(coef_arr_city_avg)[3]
+
+# Flatten coefficients into a matrix [n_cities, nbasis_day * nbasis_hour]
+# Each row is a city, columns are the concatenated basis coefficients
+coef_mat_city_avg <- matrix(nrow = n_cities, ncol = nb_s * nb_t)
+for (i in 1:n_cities) {
+  coef_mat_city_avg[i, ] <- as.vector(coef_arr_city_avg[, , i])
+}
+rownames(coef_mat_city_avg) <- city_names
+
+# Perform PCA on the coefficient matrix
+# Centering is typically done by prcomp by default (center = TRUE)
+pca_res_city_avg <- prcomp(coef_mat_city_avg, center = TRUE, scale. = FALSE)
+
+# FPCA Loadings (eigenfunctions in coefficient form)
+# pca_res_city_avg$rotation contains eigenvectors [nb_s*nb_t, n_components]
+fpca_loadings_coef <- pca_res_city_avg$rotation
+
+# Helper function to build a bivariate functional data object (a PC surface)
+# from a vector of loading coefficients
+make_pc_bifd_surface <- function(pc_idx, loadings_matrix, sbasis, tbasis) {
+  pc_coef_vec <- loadings_matrix[, pc_idx]
+  pc_coef_mat <- matrix(pc_coef_vec, nrow = sbasis$nbasis, ncol = tbasis$nbasis)
+
+  bifd(
+    coef = pc_coef_mat, sbasisobj = sbasis, tbasisobj = tbasis,
+    fdnames = list(s = "Day", t = "Hour", rep = NULL, var = paste0("PC", pc_idx))
+  )
+}
+
+# Create bifd objects for the first few principal components/surfaces
+pc1_surf_bifd <- make_pc_bifd_surface(1, fpca_loadings_coef, basis_day, basis_hour)
+pc2_surf_bifd <- make_pc_bifd_surface(2, fpca_loadings_coef, basis_day, basis_hour)
+pc3_surf_bifd <- make_pc_bifd_surface(3, fpca_loadings_coef, basis_day, basis_hour)
+
+# Evaluate PC surfaces on the original s_grid, t_grid
+PC1_vals <- eval.bifd(s_grid, t_grid, pc1_surf_bifd)
+PC2_vals <- eval.bifd(s_grid, t_grid, pc2_surf_bifd)
+PC3_vals <- eval.bifd(s_grid, t_grid, pc3_surf_bifd)
+
+# Plot PC surfaces as heatmaps
+var_explained <- (pca_res_city_avg$sdev^2 / sum(pca_res_city_avg$sdev^2)) * 100
+
+p_pc1_heatmap <- plot_heatmap_slope(PC1_vals,
+  title = sprintf("FPCA: PC1 Surface (Explains %.1f%% Var.)", var_explained[1]),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_pc1_heatmap)
+ggsave(file.path(params$output_dir, "figures/fpca_pc1_heatmap_city_avg.png"), p_pc1_heatmap, width = 9, height = 6)
+
+p_pc2_heatmap <- plot_heatmap_slope(PC2_vals,
+  title = sprintf("FPCA: PC2 Surface (Explains %.1f%% Var.)", var_explained[2]),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_pc2_heatmap)
+ggsave(file.path(params$output_dir, "figures/fpca_pc2_heatmap_city_avg.png"), p_pc2_heatmap, width = 9, height = 6)
+
+p_pc3_heatmap <- plot_heatmap_slope(PC3_vals,
+  title = sprintf("FPCA: PC3 Surface (Explains %.1f%% Var.)", var_explained[3]),
+  days_vec = s_grid, hours_vec = t_grid
+)
+print(p_pc3_heatmap)
+ggsave(file.path(params$output_dir, "figures/fpca_pc3_heatmap_city_avg.png"), p_pc3_heatmap, width = 9, height = 6)
+
+
+# Plot the FPCA scores for cities
+fpca_scores_city_avg <- as.data.frame(pca_res_city_avg$x[, 1:3]) # First 3 PCs
+fpca_scores_city_avg$City <- rownames(fpca_scores_city_avg)
+
+p_fpca_scores <- ggplot(fpca_scores_city_avg, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = City), size = 4, alpha = 0.8) +
+  geom_text_repel(aes(label = City), size = 3.5, max.overlaps = Inf) +
+  labs(
+    title = "FPCA Scores for Cities (Average Temperature Surfaces)",
+    subtitle = paste("Based on coefficients of smoothed surfaces. PC1 vs PC2."),
+    x = sprintf("PC1 (%.1f%% Variance)", var_explained[1]),
+    y = sprintf("PC2 (%.1f%% Variance)", var_explained[2]),
+    color = "City"
+  ) +
+  theme_minimal() +
+  guides(color = guide_legend(override.aes = list(size = 5)))
+print(p_fpca_scores)
+ggsave(file.path(params$output_dir, "figures/fpca_scores_pc1_pc2_city_avg.png"), p_fpca_scores, width = 10, height = 7)
+```
+
+## Superpose FPCA Scores on Map of India
+
+```{r fpca_map_visualization, warning=FALSE, message=FALSE}
+city_coords <- tibble(
+  # bengaluru, bombay, delhi, hyderabad, jaipur, kanpur, nagpur, pune
+  City = city_coords$City,
+  latitude = c(13.0, 19.1, 28.6, 17.4, 26.9, 26.5, 21.1, 18.5),
+  longitude = c(77.6, 72.9, 77.2, 78.5, 75.8, 80.3, 79.1, 73.9)
+)
+
+# Merge coordinates with FPCA scores
+fpca_map_data <- fpca_scores_city_avg %>%
+  left_join(city_coords %>% select(City, latitude, longitude), by = "City")
+
+# Get a base map of India
+india_map_sf <- ne_countries(scale = "medium", country = "India", returnclass = "sf")
+
+p_fpca_map <- ggplot() +
+  geom_sf(data = india_map_sf, fill = "gray90", color = "black") +
+  geom_point(
+    data = fpca_map_data, aes(x = longitude, y = latitude, color = PC1, size = abs(PC2)),
+    alpha = 0.8
+  ) +
+  geom_text_repel(
+    data = fpca_map_data, aes(x = longitude, y = latitude, label = City),
+    size = 3, min.segment.length = 0, seed = 42,
+    box.padding = 0.5, max.overlaps = Inf
+  ) +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "PC1 Score") +
+  scale_size_continuous(range = c(2, 10), name = "|PC2 Score|") + # abs(PC2) for size
+  labs(
+    title = "FPCA Scores of City-Average Temperature Surfaces on Map of India",
+    subtitle = "Color: PC1 Score, Size: Absolute PC2 Score"
+  ) +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "lightblue1")) + # Ocean color
+  coord_sf(
+    xlim = range(fpca_map_data$longitude, na.rm = TRUE) + c(-5, 5), # Adjust map zoom
+    ylim = range(fpca_map_data$latitude, na.rm = TRUE) + c(-5, 5), expand = FALSE
+  )
+
+print(p_fpca_map)
+ggsave(file.path(params$output_dir, "figures/fpca_scores_map_india.png"), p_fpca_map, width = 10, height = 9)
+```
+
+## Prepare Data for Yearly FPCA
+
+This section prepares data where each "replicate" is a specific city-year combination.
+
+```{r pca_yearly_points_prep}
+# Create a complete grid for all city-year combinations, days, and hours
+all_cities_years <- data_weather %>%
+  distinct(City, year) %>%
+  arrange(City, year)
+
+full_grid_for_city_years <- all_cities_years %>%
+  tidyr::crossing(day_of_year = s_grid, hour_of_day = t_grid)
+
+# Join with the actual temperature data
+yearly_hourly_temp_data <- full_grid_for_city_years %>%
+  dplyr::left_join(
+    data_weather %>% dplyr::select(City, year, day_of_year, hour_of_day, tempC),
+    by = c("City", "year", "day_of_year", "hour_of_day")
+  ) %>%
+  dplyr::arrange(City, year, day_of_year, hour_of_day)
+
+# Generate labels for each city-year observation
+city_year_combinations <- yearly_hourly_temp_data %>%
+  dplyr::distinct(City, year) %>%
+  dplyr::arrange(City, year)
+city_year_labels <- paste0(city_year_combinations$City, "_", city_year_combinations$year)
+
+# Build the 3D array Y_yearly [day, hour, city_year_observation]
+temp_matrices_yearly_list <- vector("list", nrow(city_year_combinations))
+names(temp_matrices_yearly_list) <- city_year_labels
+
+for (i in 1:nrow(city_year_combinations)) {
+  current_city <- city_year_combinations$City[i]
+  current_year <- city_year_combinations$year[i]
+
+  matrix_data_subset <- yearly_hourly_temp_data %>%
+    dplyr::filter(City == current_city, year == current_year)
+
+  # Pivot wider, ensuring all hour columns are present (h0 to h23)
+  # Use values_fn to handle cases where a day-hour might be duplicated (shouldn't happen with distinct above)
+  # Use values_fill to handle missing tempC for a given day/hour within a year (will be NA)
+  current_matrix_wide <- matrix_data_subset %>%
+    tidyr::pivot_wider(
+      names_from = hour_of_day,
+      values_from = tempC,
+      names_prefix = "h",
+      names_sort = TRUE, # Ensures h0, h1, ... h23 order
+      values_fill = NA_real_ # Explicitly fill missing combinations with NA
+    ) %>%
+    dplyr::arrange(day_of_year) %>%
+    dplyr::select(-City, -year, -day_of_year) # Keep only hour columns
+
+  # Ensure the matrix has the correct dimensions (365x24) and column names
+  # This is crucial if some hours are entirely missing for some days
+  final_matrix_for_year <- matrix(NA_real_,
+    nrow = length(s_grid),
+    ncol = length(t_grid),
+    dimnames = list(NULL, paste0("h", t_grid))
+  )
+
+  # Match columns present in current_matrix_wide to the final_matrix_for_year
+  present_cols <- intersect(colnames(final_matrix_for_year), colnames(current_matrix_wide))
+  final_matrix_for_year[, present_cols] <- as.matrix(current_matrix_wide[, present_cols])
+
+  temp_matrices_yearly_list[[i]] <- final_matrix_for_year
+}
+
+Y_yearly <- abind::abind(temp_matrices_yearly_list, along = 3)
+cat("Dimensions of Y_yearly [day, hour, city_year]:", dim(Y_yearly), "\n")
+```
+
+### FPCA on Yearly Data
+
+```{r fpca_yearly_analysis}
+# Perform bivariate smoothing on the yearly data using previously optimized lambdas
+cat("Smoothing Y_yearly data. This may take some time due to more replicates...\n")
+res_yearly <- smooth.bibasis(s_grid, t_grid, Y_yearly, fdPar_s_opt, fdPar_t_opt)
+bifd_obj_yearly <- res_yearly$bifdobj
+
+# Extract coefficients
+coef_arr_yearly <- bifd_obj_yearly$coefs # [nb_s, nb_t, n_city_years]
+n_reps_yearly <- dim(coef_arr_yearly)[3]
+
+coef_mat_yearly <- matrix(nrow = n_reps_yearly, ncol = nb_s * nb_t)
+for (i in seq_len(n_reps_yearly)) {
+  coef_mat_yearly[i, ] <- as.vector(coef_arr_yearly[, , i])
+}
+rownames(coef_mat_yearly) <- city_year_labels # Assign city_year labels
+
+# Perform PCA on the coefficient matrix for yearly data
+pca_res_yearly <- prcomp(coef_mat_yearly, center = TRUE, scale. = FALSE)
+
+# Extract PC scores
+scores_data_yearly <- as.data.frame(pca_res_yearly$x[, 1:2]) # PC1 and PC2
+names(scores_data_yearly) <- c("PC1", "PC2")
+
+# Add city and year information for plotting
+scores_data_yearly$City <- city_year_combinations$City
+scores_data_yearly$Year <- as.factor(city_year_combinations$year)
+scores_data_yearly$Label <- city_year_labels
+
+var_explained_yearly <- (pca_res_yearly$sdev^2 / sum(pca_res_yearly$sdev^2)) * 100
+
+# TODO incorrect dashed line order
+
+fpca_scores_plot_yearly <- ggplot(scores_data_yearly, aes(x = PC1, y = PC2)) +
+  # geom_line(aes(group = City), alpha = 0.7, color = "gray", linetype = "dashed") +
+  geom_point(aes(color = Year, shape = City), alpha = 0.8, size = 4) +
+  scale_shape_manual(values = 1:length(unique(scores_data_yearly$City))) + # Different shapes for each year
+  geom_text_repel(
+    aes(label = ifelse(Year == first(Year), Label, "")), # Show label only for the first year of each city
+    size = 2.5, max.overlaps = Inf, box.padding = 0.5
+  ) +
+  # geom_text_repel(aes(label = Label), size = 2, max.overlaps = 3) + # Can be too cluttered
+  labs(
+    title = "FPCA Scores of Yearly Temperature Surfaces",
+    subtitle = "Each point represents one year for one city. Smoothed using city-avg lambdas.",
+    x = paste0("Functional PC1 (", round(var_explained_yearly[1], 1), "%)"),
+    y = paste0("Functional PC2 (", round(var_explained_yearly[2], 1), "%)"),
+    color = "City",
+    shape = "Year"
+  ) +
+  theme_minimal() +
+  guides(
+    shape = guide_legend(override.aes = list(size = 3)),
+    color = guide_legend(override.aes = list(size = 3))
+  )
+
+print(fpca_scores_plot_yearly)
+ggsave(file.path(params$output_dir, "figures/pca_yearly_scores.png"), fpca_scores_plot_yearly, width = 12, height = 8)
+```
+
+## Clustering Analysis
+
+```{r clustering_city_avg}
+# Use scores from city-average FPCA: fpca_scores_city_avg (contains PC1, PC2, PC3, City)
+scores_for_clustering <- fpca_scores_city_avg[, c("PC1", "PC2", "PC3")] # Use first 3 PCs for clustering
+
+# Perform hierarchical clustering
+dist_matrix_city_avg <- dist(scores_for_clustering)
+hc_city_avg <- hclust(dist_matrix_city_avg, method = "ward.D2")
+
+# Plot the dendrogram
+plot_file_dendro <- file.path(params$output_dir, "figures/dendrogram_city_avg.png")
+png(plot_file_dendro, width = 800, height = 600)
+plot(hc_city_avg,
+  labels = fpca_scores_city_avg$City, main = "Hierarchical Clustering Dendrogram (City Averages)",
+  xlab = "Cities", ylab = "Height (Ward.D2 Distance)", cex = 0.9
+)
+rect.hclust(hc_city_avg, k = 2)
+dev.off()
+
+chosen_k <- 2
+clusters_city_avg <- cutree(hc_city_avg, k = chosen_k)
+
+# Add cluster information to the scores data frame
+scores_df_city_avg_clustered <- fpca_scores_city_avg %>%
+  mutate(Cluster = factor(clusters_city_avg))
+
+# Plot the clusters in the PCA space
+p_cluster_pca <- ggplot(scores_df_city_avg_clustered, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) +
+  geom_point(size = 4, alpha = 0.9) +
+  geom_text_repel(aes(label = City), size = 3.5, max.overlaps = Inf) +
+  labs(
+    title = paste("Clustering of Cities in PCA Space (k =", chosen_k, ")"),
+    subtitle = "Based on FPCA of city-average temperature surfaces",
+    x = sprintf("PC1 (%.1f%% Variance)", var_explained[1]),
+    y = sprintf("PC2 (%.1f%% Variance)", var_explained[2])
+  ) +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1") # Use a nice color palette
+print(p_cluster_pca)
+ggsave(file.path(params$output_dir, "figures/pca_clusters_city_avg.png"), p_cluster_pca, width = 10, height = 7)
+```
+
+### Comparison of Clusters
+
+Now we compare the characteristics of these clusters.
+
+```{r cluster_comparison}
+# Mean Surfaces per Cluster
+
+# Loop through each cluster
+for (cl_id in 1:chosen_k) {
+  cat("\n--- Cluster", cl_id, "---\n")
+  cities_in_cluster <- scores_df_city_avg_clustered %>%
+    filter(Cluster == cl_id) %>%
+    pull(City)
+  cat("Cities:", paste(cities_in_cluster, collapse = ", "), "\n")
+
+  # Get indices of these cities in the bifd object's coefficient array
+  indices_in_cluster <- which(city_names %in% cities_in_cluster)
+
+  # Calculate mean coefficient matrix for this cluster
+  mean_coef_cluster <- apply(bifd_obj_city_avg$coefs[, , indices_in_cluster, drop = FALSE], c(1, 2), mean)
+
+  # Create a bifd object for the mean surface of this cluster
+  mean_surf_cluster_bifd <- bifd(
+    coef = mean_coef_cluster,
+    sbasisobj = basis_day,
+    tbasisobj = basis_hour
+  )
+
+  # Evaluate and plot this mean surface (as a heatmap)
+  mean_surf_vals_cluster <- eval.bifd(s_grid, t_grid, mean_surf_cluster_bifd)
+
+  p_mean_surf_cluster <- plot_heatmap_slope(
+    mean_surf_vals_cluster,
+    title = paste("Mean Temperature Surface - Cluster", cl_id),
+    days_vec = s_grid,
+    hours_vec = t_grid,
+    force_center = FALSE,
+    value_range = c(12, 40)
+  )
+  print(p_mean_surf_cluster)
+  ggsave(file.path(params$output_dir, paste0("figures/mean_surface_cluster_", cl_id, ".png")), p_mean_surf_cluster, width = 8, height = 5)
+}
+
+# 2. FPCA Score Distributions per Cluster (already plotted with geom_point, can add boxplots)
+p_scores_boxplot <- ggplot(scores_df_city_avg_clustered, aes(x = Cluster, y = PC1, fill = Cluster)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Distribution of PC1 Scores by Cluster", x = "Cluster", y = "PC1 Score") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")
+print(p_scores_boxplot)
+ggsave(file.path(params$output_dir, "figures/pc1_scores_by_cluster.png"), p_scores_boxplot, width = 7, height = 5)
+
+p_scores_boxplot_pc2 <- ggplot(scores_df_city_avg_clustered, aes(x = Cluster, y = PC2, fill = Cluster)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Distribution of PC2 Scores by Cluster", x = "Cluster", y = "PC2 Score") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")
+print(p_scores_boxplot_pc2)
+ggsave(file.path(params$output_dir, "figures/pc2_scores_by_cluster.png"), p_scores_boxplot_pc2, width = 7, height = 5)
+
+
+# 3. Geographical Distribution
+map_data_clustered <- fpca_map_data %>%
+  left_join(scores_df_city_avg_clustered %>% select(City, Cluster), by = "City")
+
+p_cluster_map <- ggplot() +
+  geom_sf(data = india_map_sf, fill = "gray90", color = "black") + # Assuming india_map_sf exists
+  geom_point(
+    data = map_data_clustered %>% filter(!is.na(Cluster)),
+    aes(x = longitude, y = latitude, color = Cluster, shape = Cluster), size = 5, alpha = 0.8
+  ) +
+  geom_text_repel(
+    data = map_data_clustered %>% filter(!is.na(Cluster)),
+    aes(x = longitude, y = latitude, label = City),
+    size = 3, min.segment.length = 0, seed = 42, box.padding = 0.5, max.overlaps = Inf
+  ) +
+  scale_color_brewer(palette = "Set1") +
+  scale_shape_manual(values = 1:chosen_k) + # Use different shapes
+  labs(
+    title = "Geographical Distribution of City Clusters",
+    subtitle = "Based on FPCA of average temperature surfaces"
+  ) +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "lightblue1")) +
+  coord_sf(
+    xlim = range(map_data_clustered$longitude, na.rm = TRUE) + c(-5, 5),
+    ylim = range(map_data_clustered$latitude, na.rm = TRUE) + c(-5, 5), expand = FALSE
+  )
+
+print(p_cluster_map)
+ggsave(file.path(params$output_dir, "figures/cluster_map_india.png"), p_cluster_map, width = 10, height = 9)
+```
+
+## Pointwise ANOVA (FANOVA)
+
+Test for differences in mean temperature functions between the identified clusters.
+We'll use `fda.usc` and test differences in the mean *daily temperature profiles at midday*.
+
+```{r fanova_analysis}
+cluster_assignments <- scores_df_city_avg_clustered$Cluster
+
+num_days <- length(s_grid)
+num_hours <- length(t_grid)
+num_cities <- dim(Y_smoothed_city_avg_grid)[3]
+
+# Initialize matrices to store p-values and F-statistics
+p_value_matrix <- matrix(NA, nrow = num_days, ncol = num_hours)
+
+cat("Performing pointwise ANOVA for cluster mean differences...\n")
+for (i in 1:num_days) {
+  for (j in 1:num_hours) {
+    # Extract temperature data for the current day i and hour j for all cities
+    temps_at_point <- Y_smoothed_city_avg_grid[i, j, ]
+    
+    # Create a data frame for the ANOVA/t-test
+    anova_df <- data.frame(
+      temperature = temps_at_point,
+      cluster = cluster_assignments
+    )
+    
+    # Perform ANOVA
+    res_aov <- aov(temperature ~ cluster, data = anova_df)
+  }
+}
+cat("Pointwise ANOVA completed.\n")
+
+# Transform p-values: -log10(p-value)
+# Add a small constant to p-values to avoid log10(0) if any p-value is exactly 0
+neg_log10_p_value_matrix <- -log10(p_value_matrix + 1e-16)
+
+# Determine a sensible range for the color scale, e.g., up to -log10(0.001) = 3
+# or cap at a high percentile if there are extreme values.
+max_val_plot <- quantile(neg_log10_p_value_matrix, 0.99, na.rm = TRUE)
+
+# Plot the heatmap of -log10(p-values)
+p_pointwise_anova <- plot_heatmap_slope(
+  slope_matrix = neg_log10_p_value_matrix,
+  title = "Significance of Temp. Difference between Clusters (-log10 P-value)",
+  days_vec = s_grid,
+  hours_vec = t_grid,
+  force_center = FALSE, # We want a sequential interpretation from 0 upwards
+  value_range = c(0, max_val_plot) # Scale from 0 to max_val_plot
+) + 
+  scale_fill_gradientn(
+    colors = c("lightgrey", "lightblue", "yellow", "orange", "red"), # More intuitive for significance
+    limits = c(0, max_val_plot),
+    name = "-log10(P-val)"
+  ) +
+  labs(subtitle = paste0("Comparison between Cluster 1 and Cluster 2. Higher values indicate greater significance.\nThreshold for p<0.05 is -log10(0.05) \u2248 1.3. Capped at ", round(max_val_plot,2), " (99th percentile)."))
+
+print(p_pointwise_anova)
+ggsave(file.path(params$output_dir, "figures/pointwise_anova_clusters_heatmap.png"), p_pointwise_anova, width = 9, height = 6)
+```
+
+## Functional Time Series Modeling and Forecasting
+
+We'll select one cluster and model how its daily mean temperature profile (averaged over hours) evolves across the years 2011-2018.
+
+```{r functional_time_series_modeling}
+# Data Preparation
+
+# Add Cluster information to the yearly data scores
+city_year_cluster_info <- scores_data_yearly %>%
+  left_join(scores_df_city_avg_clustered %>% select(City, Cluster), by = "City")
+
+# Model Cluster 1
+target_cluster_id <- 1 
+target_cluster_cities <- scores_df_city_avg_clustered %>% 
+  filter(Cluster == target_cluster_id) %>% 
+  pull(City)
+
+cat("Selected Cluster for FTS:", target_cluster_id, "\n")
+cat("Cities in Cluster", target_cluster_id, ":", paste(target_cluster_cities, collapse=", "), "\n")
+
+years_for_fts <- 2011:2018
+num_years_fts <- length(years_for_fts)
+
+# Matrix to store the annual mean daily temperature profiles for the selected cluster
+# Rows: days of the year (s_grid), Columns: years
+cluster_annual_profiles_smoothed <- matrix(
+  NA,
+  nrow = length(s_grid),
+  ncol = num_years_fts,
+  dimnames = list(as.character(s_grid), as.character(years_for_fts))
+)
+
+cat("Preparing annual mean daily temperature profiles for Cluster", target_cluster_id, "...\n")
+for (current_year in years_for_fts) {
+  current_year_labels_in_cluster <- city_year_cluster_info %>%
+    filter(Year == current_year, Cluster == target_cluster_id) %>%
+    pull(Label)
+
+  # Get indices of these city-year surfaces in the coefficient array of bifd_obj_yearly
+  indices_in_coef_array <- which(city_year_labels %in% current_year_labels_in_cluster)
+  
+  # Calculate the mean coefficient matrix for this cluster and year
+  mean_coefs_cluster_year <- apply(
+    bifd_obj_yearly$coefs[, , indices_in_coef_array, drop = FALSE],
+    c(1, 2), # Average over the 1st (day basis) and 2nd (hour basis) dimensions
+    mean,
+    na.rm = TRUE
+  )
+  
+  # Create a bifd object for the mean surface of this cluster-year
+  mean_surf_cluster_year_bifd <- bifd(
+    coef = mean_coefs_cluster_year,
+    sbasisobj = basis_day,
+    tbasisobj = basis_hour
+  )
+  
+  # Evaluate this mean surface on the s_grid (days) and t_grid (hours)
+  evaluated_surf_cluster_year <- eval.bifd(s_grid, t_grid, mean_surf_cluster_year_bifd)
+  
+  # To get the mean daily temperature profile, average over the hours (t_grid, which is the 2nd dimension of evaluated_surf_cluster_year)
+  daily_profile_cluster_year <- apply(evaluated_surf_cluster_year, 1, mean, na.rm = TRUE)
+  
+  cluster_annual_profiles_smoothed[, as.character(current_year)] <- daily_profile_cluster_year
+}
+cat("Finished preparing annual profiles.\n")
+
+# Functional Time Series Modeling and Forecasting with ftsa
+
+# Each row is a point on the functional curve (day of year).
+fts_cluster_data <- fts(
+  x = s_grid,
+  y = cluster_annual_profiles_smoothed,
+  start = min(years_for_fts),
+  frequency = 1,
+  xname = "Mean Daily Temperature Profile",
+  yname = "Day of Year"
+)
+
+p_fts_data <- ggplot(data = fts_cluster_data, aes(x = x, y = y)) +
+  # geom_line(aes(group = rownames(fts_cluster_data)), color = "grey", alpha = 0.5) +
+  geom_line(stat = "summary", fun = "mean", color = "blue", size = 1.2) +
+  labs(
+    title = paste("Mean Daily Temperature Profiles - Cluster", target_cluster_id),
+    x = "Day of Year",
+    y = "Mean Temperature (°C)"
+  ) +
+  theme_minimal()
+
+
+# Plot the functional time series
+plot_file_fts_data <- file.path(params$output_dir, paste0("figures/fts_cluster", target_cluster_id, "_profiles.png"))
+png(plot_file_fts_data, width = 800, height = 600)
+plot(fts_cluster_data, 
+      main = paste("Annual Mean Daily Temperature Profiles - Cluster", target_cluster_id),
+      xlab = "Day of Year", ylab = "Mean Temperature (°C)")
+dev.off()
+cat("Plotted FTS data to:", plot_file_fts_data, "\n")
+
+num_pcs_fts <- 3
+cat("Fitting FTS model with", num_pcs_fts, "principal components...\n")
+model_fts_cluster <- ftsm(y = fts_cluster_data, order = num_pcs_fts, method = "classical")
+
+print(model_fts_cluster)
+cat("Variance explained by PCs:", model_fts_cluster$varprop, "\n")
+
+# Plot model components (mean function and eigenfunctions)
+plot_file_fts_model <- file.path(params$output_dir, paste0("figures/fts_cluster",target_cluster_id,"_model.png"))
+png(plot_file_fts_model, width = 900, height = 700)
+plot(model_fts_cluster, main_title = paste("FTS Model Components - Cluster", target_cluster_id))
+dev.off()
+cat("Plotted FTS model components to:", plot_file_fts_model, "\n")
+
+# Forecast for the next year (2019)
+cat("Forecasting 1 year ahead...\n")
+forecast_fts_cluster <- forecast(model_fts_cluster, h = 1, level = 95)
+
+# Plot the forecast
+plot_file_fts_forecast <- file.path(params$output_dir, paste0("figures/fts_cluster",target_cluster_id,"_forecast.png"))
+png(plot_file_fts_forecast, width = 800, height = 600)
+plot(
+  forecast_fts_cluster,
+  main = paste("Forecast of Mean Daily Temperature Profile - Cluster", target_cluster_id, "for", max(years_for_fts)+1),
+  xlab = "Day of Year",
+  ylab = "Mean Temperature (°C)"
+)
+legend("topleft", legend=c("Historical Data", "Forecast Mean", "80% PI", "95% PI"), 
+        col=c("grey", "blue", "lightblue", "lightcyan"), lty=c(1,1,2,2), lwd=c(1,2,1,1), cex=0.8)
+dev.off()
+cat("Plotted FTS forecast to:", plot_file_fts_forecast, "\n")
+```

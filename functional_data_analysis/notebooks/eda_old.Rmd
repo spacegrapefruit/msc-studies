@@ -1,0 +1,321 @@
+---
+title: "EDA and Functional Data Analysis of Weather Data"
+author: "Aleksandr J. Smoliakov"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+# Set global chunk options and working directory
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/aleks/msc-studies/functional_data_analysis")
+input_dir <- file.path(getwd(), "data/input")
+output_dir <- file.path(getwd(), "data/output")
+```
+
+```{r libraries}
+# Load required libraries
+library(fda)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(stringr)
+```
+
+## Loading and Preprocessing Weather Data
+
+```{r load-weather-data}
+# Load the weather data from multiple CSV files
+data_weather <- list()
+
+for (file_name in dir(input_dir)) {
+  # Extract city name from file name (e.g., "bombay.csv" -> "Bombay")
+  city_name <- strsplit(file_name, "\\.")[[1]][1]
+  city_name <- paste0(
+    toupper(substring(city_name, 1, 1)), substring(city_name, 2)
+  )
+
+  file_path <- file.path(input_dir, file_name)
+  this_data <- read_csv(file_path, show_col_types = FALSE) %>%
+    select(date_time, tempC) %>%
+    filter(year(date_time) %in% 2011:2018) %>%
+    mutate(City = city_name)
+
+  data_weather[[length(data_weather) + 1]] <- this_data
+
+  cat("Loaded weather data for city", city_name, "\n")
+}
+
+# Combine all city data and clean up variable names
+data_weather <- bind_rows(data_weather) %>%
+  mutate(
+    date = as.Date(date_time),
+    day_of_year = yday(date_time)
+  )
+
+# Display a summary of the loaded data
+summary(data_weather)
+```
+
+## Preprocessing for Functional Data Analysis
+
+```{r preprocess-fda}
+# Convert to daily data by averaging temperature for each city and day_of_year
+daily_data <- data_weather %>%
+  group_by(City, day_of_year) %>%
+  summarise(
+    tempC = mean(tempC, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(City, day_of_year)
+```
+
+## Unsmoothed Temperature Curves by City
+
+```{r unsmoothed-curves}
+# Plot unsmoothed temperature curves for each city
+daily_data %>%
+  ggplot(aes(x = day_of_year, y = tempC, color = City)) +
+  geom_line(alpha = 0.4) +
+  labs(
+    title = "Temperature Curves by City (2011-2018)",
+    x = "Day of Year",
+    y = "Temperature (°C)"
+  )
+
+# Save the unsmoothed curves plot
+plot_file <- file.path(output_dir, "unsmoothed_temperature_curves.png")
+ggsave(plot_file, width = 10, height = 6)
+```
+
+## Smoothing and Basis Function Setup
+
+```{r smoothing-setup}
+# Define the time points for the functional data
+date_range <- range(daily_data$day_of_year)
+time_points <- seq(date_range[1], date_range[2], by = 1)
+# Create a matrix of temperature values for each city
+temp_matrix <- daily_data %>%
+  pivot_wider(names_from = City, values_from = tempC) %>%
+  select(-day_of_year) %>%
+  as.matrix()
+# Create a basis object for functional data analysis
+basis_obj <- create.fourier.basis(
+  rangeval = date_range,
+  nbasis = 25, # Number of basis functions
+  period = 365 # Periodicity for annual data
+)
+# Display the basis object
+print(basis_obj)
+
+# Plot the basis functions
+plot(basis_obj, main = "Fourier Basis Functions", xlab = "Day of Year", ylab = "Basis Function Value")
+
+# Define a range of lambda values (e.g., from 10^-4 to 10^0.6)
+lambda_range <- 10^seq(-4, 3, length.out = 50)
+gcv_errors <- numeric(length(lambda_range))
+
+# Loop over each lambda value and compute the smoothing error (GCV)
+for (i in seq_along(lambda_range)) {
+  fd_par_obj <- fdPar(basis_obj, Lfdobj = 2, lambda = lambda_range[i])
+  smooth_result <- smooth.basis(
+    argvals = time_points,
+    y = temp_matrix,
+    fdParobj = fd_par_obj
+  )
+  # Here, we sum the GCV values across days; alternatively, take the mean
+  gcv_errors[i] <- sum(smooth_result$gcv)
+}
+
+# Create a data frame for plotting
+gcv_df <- data.frame(lambda = lambda_range, gcv = gcv_errors)
+# Find the optimal lambda value that minimizes GCV
+optimal_lambda <- gcv_df$lambda[which.min(gcv_df$gcv)]
+
+# Plot smoothing error vs lambda using ggplot2 with a logarithmic x-axis
+ggplot(gcv_df, aes(x = lambda, y = gcv)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10() +
+  geom_vline(
+    xintercept = optimal_lambda,
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Smoothing Error vs. Smoothing Parameter (Lambda)",
+    x = expression(lambda),
+    y = "GCV Error"
+  )
+
+plot_file <- file.path(output_dir, "lambda_vs_gcv.png")
+ggsave(plot_file, width = 8, height = 6)
+```
+
+## Functional Data Smoothing
+
+```{r functional-smoothing}
+# Smooth the data using Data2fd to create an fd object
+fd_object <- Data2fd(
+  argvals = time_points,
+  y = temp_matrix,
+  basisobj = basis_obj,
+  lambda = optimal_lambda,
+)
+```
+
+## Plotting Smoothed Temperature Curves
+
+```{r smoothed-curves}
+# Plot the smoothed temperature curves for each city
+fd_object %>%
+  plot(
+    xlab = "Day of Year", ylab = "Temperature (°C)",
+    main = "Smoothed Temperature Curves by City (2011-2018)",
+    cex.axis = 1.5, cex.lab = 1.5, cex.main = 1.5
+  )
+
+# Add a legend for the cities
+legend("topright", legend = colnames(temp_matrix), col = 1:ncol(temp_matrix), lty = 1, cex = 0.8)
+# Customize the plot appearance
+par(mar = c(5, 5, 2, 2)) # Adjust margins for better visibility
+# Set the x-axis ticks to show day of year
+# axis(1, at = seq(0, 365, by = 30), labels = seq(0, 365, by = 30), cex.axis = 1.2)
+
+# Save the smoothed curves plot
+plot_file <- file.path(output_dir, "smoothed_temperature_curves.png")
+ggsave(plot_file, width = 10, height = 6)
+```
+
+## Covariance Analysis and Heatmap
+
+```{r covariance-heatmap}
+# Compute the mean and covariance functions of the smoothed data
+mean_fd <- mean.fd(fd_object)
+cov_fd <- var.fd(fd_object)
+
+# Evaluate the covariance function on a grid
+grid <- time_points
+cov_mat <- eval.bifd(grid, grid, cov_fd)
+
+# Prepare a data frame for plotting the covariance heatmap
+cov_df <- expand.grid(hour1 = grid, hour2 = grid)
+cov_df$covariance <- as.vector(cov_mat)
+
+# Create a 2D heatmap of the covariance surface
+ggplot(cov_df, aes(x = hour1, y = hour2, fill = covariance)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("blue", "white", "red"), limits = c(-30, 30)) +
+  labs(
+    title = "Covariance Heatmap",
+    x = "Hour",
+    y = "Hour"
+  )
+
+# Save the covariance heatmap
+plot_file <- file.path(output_dir, "covariance_heatmap.png")
+ggsave(plot_file, width = 7, height = 6)
+```
+
+## Derivative Analysis
+
+```{r derivatives, warning=FALSE, message=FALSE}
+# Compute the first derivative (slope) and second derivative (acceleration)
+slope_fd <- deriv.fd(fd_object, 1)
+acceleration_fd <- deriv.fd(fd_object, 2)
+
+# Plot the first derivative (slope)
+plot_file <- file.path(output_dir, "slope_fd_plot.png")
+png(plot_file, width = 800, height = 600)
+plot(
+  slope_fd,
+  xlab = "Day of Year", ylab = "Slope",
+  main = "Slope of Temperature curves",
+  cex.axis = 2, cex.lab = 2, cex.main = 2
+)
+dev.off()
+
+# Plot the second derivative (acceleration)
+plot_file <- file.path(output_dir, "acceleration_fd_plot.png")
+png(plot_file, width = 800, height = 600)
+plot(
+  acceleration_fd,
+  xlab = "Day of Year", ylab = "Acceleration",
+  main = "Acceleration of Temperature curves",
+  cex.axis = 2, cex.lab = 2, cex.main = 2
+)
+dev.off()
+```
+
+## Functional Principal Component Analysis (FPCA)
+
+```{r fpca}
+# Conduct FPCA on the functional data
+pca_results <- pca.fd(fd_object, nharm = 3, centerfns = TRUE)
+cat("Proportion of variance explained:\n")
+print(pca_results$varprop)
+
+# Plot the principal components
+plot_file <- file.path(output_dir, "pca_plot.png")
+png(plot_file, width = 800, height = 400)
+par(mfrow = c(1, 3))
+for (i in 1:3) {
+  plot(pca_results$harmonics[i],
+    main = paste(
+      "PC", i,
+      "(Exp Var:", round(pca_results$varprop[i] * 100, 2), "%)"
+    ),
+    xlab = "Hour", ylab = "Harmonic Function",
+    cex.axis = 2, cex.lab = 2, cex.main = 2
+  )
+}
+par(mfrow = c(1, 1))
+dev.off()
+
+# Plot the scores of the first two principal components
+scores <- pca_results$scores[, 1:2]
+row.names(scores) <- colnames(temp_matrix)
+scores %>%
+  as.data.frame() %>%
+  ggplot(aes(x = V1, y = V2)) +
+  geom_point(aes(color = rownames(scores)), size = 3) +
+  geom_text(aes(label = rownames(scores)), vjust = -1, size = 3) +
+  labs(
+    title = "FPCA Scores (First Two Components)",
+    x = "PC1", y = "PC2"
+  ) +
+  theme_minimal()
+```
+
+## Clustering Analysis
+
+```{r clustering}
+# Perform hierarchical clustering of the cities based on the first two principal components
+dist_matrix <- dist(scores)
+hc <- hclust(dist_matrix, method = "ward.D2")
+
+# Plot the dendrogram
+# plot_file <- file.path(output_dir, "dendrogram.png")
+# png(plot_file, width = 800, height = 600)
+plot(hc, labels = rownames(scores), main = "Hierarchical Clustering Dendrogram", cex = 0.8)
+# dev.off()
+# Cut the dendrogram into clusters
+clusters <- cutree(hc, k = 3) # Change k to the desired number of clusters
+# Add cluster information to the scores data frame
+scores_df <- as.data.frame(scores)
+scores_df$Cluster <- factor(clusters)
+# Plot the clusters in the PCA space
+scores_df %>%
+  ggplot(aes(x = V1, y = V2, color = Cluster)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = rownames(scores_df)), vjust = -1, size = 3) +
+  labs(
+    title = "Clustering of Cities in PCA Space",
+    x = "PC1", y = "PC2"
+  ) +
+  theme_minimal()
+```
