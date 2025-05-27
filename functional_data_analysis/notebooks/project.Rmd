@@ -6,6 +6,13 @@ output:
   html_document:
     toc: true
     toc_depth: 4
+    code_folding: hide
+    number_sections: true
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    fig_caption: true
 ---
 
 ```{r setup, include=FALSE}
@@ -276,6 +283,8 @@ ggplot(gcv_df_2d, aes(x = log10(lambda_s), y = log10(lambda_t), fill = GCV)) +
 ggsave(file.path(params$output_dir, "figures/gcv_surface_2d.png"), width = 8, height = 6)
 ```
 
+The minimum lambda values were also the ones that minimized the GCV.
+
 ## Bivariate Smoothing and Visualization
 
 In this section, we will smooth the city-average data using the optimal lambda values found earlier and visualize the results.
@@ -349,6 +358,8 @@ print("Mean Absolute Error between smoothed and original data:")
 print(mean(abs(Y_smoothed_city_avg_grid - Y)))
 ```
 
+The smoothing error is quite low at just above 0.5 C on average, indicating that the smoothing process has preserved the underlying temperature patterns well.
+
 ## Derivatives Heatmaps (City Averages)
 
 We will compute the derivatives of the smoothed temperature surfaces with respect to day and hour, and visualize them as heatmaps.
@@ -395,6 +406,8 @@ p_der_t2 <- plot_heatmap_slope(
 print(p_der_t2)
 ggsave(file.path(params$output_dir, "figures/derivative_hour2_city_avg.png"), p_der_t2, width = 8, height = 5)
 ```
+
+Daily and hourly derivatives show a surprisingly stable pattern across the year, with some seasonal variations.
 
 ## Covariance Analysis and Heatmap
 
@@ -541,6 +554,8 @@ print(p_fpca_scores)
 ggsave(file.path(params$output_dir, "figures/fpca_scores_pc1_pc2_city_avg.png"), p_fpca_scores, width = 10, height = 7)
 ```
 
+The first two principal components (PC1 and PC2) capture the main variability in the temperature surfaces across cities. PC1 captures the overall temperature trend, while PC2 seems to capture the seasonal variation in temperatures.
+
 ## Superpose FPCA Scores on Map of India
 
 We will visualize the FPCA scores of the city-average temperature surfaces on a map of India, using the first two principal components.
@@ -588,6 +603,8 @@ p_fpca_map <- ggplot() +
 print(p_fpca_map)
 ggsave(file.path(params$output_dir, "figures/fpca_scores_map_india.png"), p_fpca_map, width = 10, height = 9)
 ```
+
+Clearly, PC1 is related to the location of the city, with southern cities having lower PC1 scores (cooler temperatures) and northern cities having higher scores (warmer temperatures).
 
 ## Prepare Data for Yearly FPCA
 
@@ -719,6 +736,8 @@ fpca_scores_plot_yearly <- ggplot(scores_data_yearly, aes(x = PC1, y = PC2)) +
 print(fpca_scores_plot_yearly)
 ggsave(file.path(params$output_dir, "figures/pca_yearly_scores.png"), fpca_scores_plot_yearly, width = 10, height = 6)
 ```
+
+The cities are surprisingly well-separated in the PCA space, with most cities forming a distinct cluster of points across years.
 
 ## Clustering Analysis
 
@@ -873,6 +892,8 @@ print(p_cluster_map)
 ggsave(file.path(params$output_dir, "figures/cluster_map_india.png"), p_cluster_map, width = 6, height = 5)
 ```
 
+Clustering analysis reveals two distinct groups of cities based on their temperature patterns. The first cluster includes cities with significantly less exposure to extreme temperatures (milder winters and summers), while the second cluster contains cities with more pronounced seasonal temperature variations.
+
 ## Pointwise ANOVA (FANOVA)
 
 Test for differences in mean temperature functions between the identified clusters.
@@ -937,6 +958,8 @@ p_pointwise_anova <- plot_heatmap_slope(
 print(p_pointwise_anova)
 ggsave(file.path(params$output_dir, "figures/pointwise_anova_clusters_heatmap.png"), p_pointwise_anova, width = 9, height = 6)
 ```
+
+We reject the null hypothesis of equal means at many points, most notably in the summer and winter months, especially around midday. This suggests that the temperature profiles of the two clusters are significantly different, particularly during extreme weather conditions.
 
 ## Functional Regression Modeling
 
