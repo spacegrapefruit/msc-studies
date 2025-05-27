@@ -156,6 +156,8 @@ average_hourly_data %>% glimpse()
 
 ## Exploratory Data Analysis: Unsmoothed Temperature Curves
 
+We will plot the average temperature curves for each city without smoothing to visualize the raw data.
+
 ```{r unsmoothed_plots}
 # plot unsmoothed temperature curves for each city
 average_hourly_data %>%
@@ -330,6 +332,8 @@ smoothed_midday_df <- as.data.frame.table(Y_smoothed_city_avg_fine[, which.min(a
   rename(day_of_year_fine = Var1, City = Var2) %>%
   mutate(day_of_year_fine = s_fine[as.numeric(day_of_year_fine)])
 
+levels(smoothed_midday_df$City) <- city_names # ensure correct city names
+
 ggplot(smoothed_midday_df, aes(x = day_of_year_fine, y = tempC, color = City)) +
   geom_line() +
   labs(
@@ -346,6 +350,8 @@ print(mean(abs(Y_smoothed_city_avg_grid - Y)))
 ```
 
 ## Derivatives Heatmaps (City Averages)
+
+We will compute the derivatives of the smoothed temperature surfaces with respect to day and hour, and visualize them as heatmaps.
 
 ```{r derivatives_heatmaps_city_avg}
 # derivatives w.r.t. day (s) for the first city
@@ -392,7 +398,7 @@ ggsave(file.path(params$output_dir, "figures/derivative_hour2_city_avg.png"), p_
 
 ## Covariance Analysis and Heatmap
 
-This section analyzes the covariance of hourly temperatures, treating days as replicates for a chosen city.
+We'll analyze the covariance of hourly temperatures, treating days as replicates for a chosen city.
 
 ```{r covariance-heatmap_city_avg}
 # use the smoothed data for one city (city_idx_to_plot)
@@ -537,6 +543,8 @@ ggsave(file.path(params$output_dir, "figures/fpca_scores_pc1_pc2_city_avg.png"),
 
 ## Superpose FPCA Scores on Map of India
 
+We will visualize the FPCA scores of the city-average temperature surfaces on a map of India, using the first two principal components.
+
 ```{r fpca_map_visualization, warning=FALSE, message=FALSE}
 city_coords <- tibble(
   # Bengaluru, Bombay, Delhi, Hyderabad, Jaipur, Kanpur, Nagpur, Pune
@@ -651,9 +659,10 @@ cat("Dimensions of Y_yearly [day, hour, city_year]:", dim(Y_yearly), "\n")
 
 ### FPCA on Yearly Data
 
+We will now perform FPCA on the yearly data using the previously optimized lambda values for the city-average data.
+
 ```{r fpca_yearly_analysis}
 # perform bivariate smoothing on the yearly data using previously optimized lambdas
-cat("Smoothing Y_yearly data. This may take some time due to more replicates...\n")
 res_yearly <- smooth.bibasis(s_grid, t_grid, Y_yearly, fdPar_s_opt, fdPar_t_opt)
 bifd_obj_yearly <- res_yearly$bifdobj
 
@@ -712,6 +721,8 @@ ggsave(file.path(params$output_dir, "figures/pca_yearly_scores.png"), fpca_score
 ```
 
 ## Clustering Analysis
+
+We will perform clustering on the FPCA scores of the city-average temperature surfaces to identify groups of cities with similar temperature patterns.
 
 ```{r clustering_city_avg}
 # use scores from city-average FPCA: fpca_scores_city_avg (contains PC1, PC2, PC3, City)
@@ -928,6 +939,8 @@ ggsave(file.path(params$output_dir, "figures/pointwise_anova_clusters_heatmap.pn
 ```
 
 ## Functional Regression Modeling
+
+In this section, we will fit a functional regression model to predict midday temperatures based on midnight temperatures. This is a function-on-function regression where both the response and predictor are functional data objects.
 
 ```{r regression_modeling}
 # # helper function to extract univariate functional data for a specific hour
