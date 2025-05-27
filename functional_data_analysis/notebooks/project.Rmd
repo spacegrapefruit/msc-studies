@@ -93,7 +93,13 @@ plot_heatmap_slope <- function(slope_matrix, title, days_vec, hours_vec, force_c
       name = "Value"
     ) +
     labs(title = title, x = "Day of Year", y = "Hour of Day") +
-    theme_minimal()
+    theme_minimal() +
+    # increase font size for the presentation
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      axis.title = element_text(size = 14),
+      axis.text = element_text(size = 12)
+    )
 }
 ```
 
@@ -518,6 +524,12 @@ p_fpca_scores <- ggplot(fpca_scores_city_avg, aes(x = PC1, y = PC2)) +
     color = "City"
   ) +
   theme_minimal() +
+  # increase size for presentation
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  ) +
   guides(color = guide_legend(override.aes = list(size = 5)))
 print(p_fpca_scores)
 ggsave(file.path(params$output_dir, "figures/fpca_scores_pc1_pc2_city_avg.png"), p_fpca_scores, width = 10, height = 7)
@@ -676,8 +688,8 @@ fpca_scores_plot_yearly <- ggplot(scores_data_yearly, aes(x = PC1, y = PC2)) +
   geom_point(aes(color = Year, shape = City), alpha = 0.8, size = 4) +
   scale_shape_manual(values = 1:length(unique(scores_data_yearly$City))) + # Different shapes for each year
   geom_text_repel(
-    aes(label = ifelse(Year == first(Year), Label, "")), # Show label only for the first year of each city
-    size = 2.5, max.overlaps = Inf, box.padding = 0.5
+    aes(label = ifelse(Year == first(Year), City, "")), # Show label only for the first year of each city
+    size = 5, max.overlaps = Inf, box.padding = 0.5
   ) +
   # geom_text_repel(aes(label = Label), size = 2, max.overlaps = 3) + # Can be too cluttered
   labs(
@@ -689,13 +701,14 @@ fpca_scores_plot_yearly <- ggplot(scores_data_yearly, aes(x = PC1, y = PC2)) +
     shape = "Year"
   ) +
   theme_minimal() +
-  guides(
-    shape = guide_legend(override.aes = list(size = 3)),
-    color = guide_legend(override.aes = list(size = 3))
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
   )
 
 print(fpca_scores_plot_yearly)
-ggsave(file.path(params$output_dir, "figures/pca_yearly_scores.png"), fpca_scores_plot_yearly, width = 12, height = 8)
+ggsave(file.path(params$output_dir, "figures/pca_yearly_scores.png"), fpca_scores_plot_yearly, width = 10, height = 6)
 ```
 
 ## Clustering Analysis
@@ -728,7 +741,7 @@ scores_df_city_avg_clustered <- fpca_scores_city_avg %>%
 # plot the clusters in the PCA space
 p_cluster_pca <- ggplot(scores_df_city_avg_clustered, aes(x = PC1, y = PC2, color = Cluster, shape = Cluster)) +
   geom_point(size = 4, alpha = 0.9) +
-  geom_text_repel(aes(label = City), size = 3.5, max.overlaps = Inf) +
+  geom_text_repel(aes(label = City), size = 5, max.overlaps = Inf) +
   labs(
     title = paste("Clustering of Cities in PCA Space (k =", chosen_k, ")"),
     subtitle = "Based on FPCA of city-average temperature surfaces",
@@ -736,9 +749,15 @@ p_cluster_pca <- ggplot(scores_df_city_avg_clustered, aes(x = PC1, y = PC2, colo
     y = sprintf("PC2 (%.1f%% Variance)", var_explained[2])
   ) +
   theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  ) +
   scale_color_brewer(palette = "Set1")
+
 print(p_cluster_pca)
-ggsave(file.path(params$output_dir, "figures/pca_clusters_city_avg.png"), p_cluster_pca, width = 10, height = 7)
+ggsave(file.path(params$output_dir, "figures/pca_clusters_city_avg.png"), p_cluster_pca, width = 6, height = 5)
 ```
 
 ### Comparison of Clusters
@@ -779,6 +798,11 @@ for (cl_id in 1:chosen_k) {
     hours_vec = t_grid,
     force_center = FALSE,
     value_range = c(12, 40)
+  ) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
   )
   print(p_mean_surf_cluster)
   ggsave(file.path(params$output_dir, paste0("figures/mean_surface_cluster_", cl_id, ".png")), p_mean_surf_cluster, width = 8, height = 5)
@@ -823,14 +847,19 @@ p_cluster_map <- ggplot() +
     subtitle = "Based on FPCA of average temperature surfaces"
   ) +
   theme_minimal() +
-  theme(panel.background = element_rect(fill = "lightblue1")) +
+  theme(
+    panel.background = element_rect(fill = "lightblue1"),
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  ) +
   coord_sf(
     xlim = range(map_data_clustered$longitude, na.rm = TRUE) + c(-5, 5),
     ylim = range(map_data_clustered$latitude, na.rm = TRUE) + c(-5, 5), expand = FALSE
   )
 
 print(p_cluster_map)
-ggsave(file.path(params$output_dir, "figures/cluster_map_india.png"), p_cluster_map, width = 10, height = 9)
+ggsave(file.path(params$output_dir, "figures/cluster_map_india.png"), p_cluster_map, width = 6, height = 5)
 ```
 
 ## Pointwise ANOVA (FANOVA)
@@ -887,7 +916,12 @@ p_pointwise_anova <- plot_heatmap_slope(
     limits = c(0, max_val_plot),
     name = "-log10(P-val)"
   ) +
-  labs(subtitle = paste0("Comparison between Cluster 1 and Cluster 2. Higher values indicate greater significance.\nThreshold for p<0.05 is -log10(0.05) \u2248 1.3. Capped at ", round(max_val_plot,2), " (99th percentile)."))
+  labs(subtitle = paste0("Comparison between Cluster 1 and Cluster 2. Higher values indicate greater significance. Capped at ", round(max_val_plot,2), " (99th percentile).")) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
 
 print(p_pointwise_anova)
 ggsave(file.path(params$output_dir, "figures/pointwise_anova_clusters_heatmap.png"), p_pointwise_anova, width = 9, height = 6)
