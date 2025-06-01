@@ -1,15 +1,47 @@
-# Longest Vessel Route using PySpark
+# AIS Port Detection
 
-This project processes Automatic Identification System (AIS) data from vessels to determine the total distance traveled by each vessel. It utilizes Apache Spark (PySpark) for efficient computation on large datasets.
+This project detects marine transportation ports from AIS (Automatic Identification System). It utilizes Apache Spark (PySpark) for efficient computation on large datasets.
 
-The core objectives are:
-- Ingest and clean AIS data from a CSV file.
-- Calculate the distance between consecutive AIS pings for each vessel using the Haversine formula.
-- Implement a data quality filter to identify and exclude vessels exhibiting anomalous speeds (defined as > 200 m/s between pings), which likely indicate positional errors or data corruption.
-- Aggregate the segment distances to find the total route length for each valid vessel.
-- Report the top 5 vessels with the longest routes on the processed day.
+## Port Detection Approach
 
-The script is designed to be configurable via a `config.yml` file for input parameters.
+1. **Filtering:**
+   * The AIS data is loaded from a CSV file.
+   * Invalid coordinates are removed.
+   * Vessels with Speed Over Ground (SOG) > 2.5 knots are filtered out.
+   * Vessels with Navigational Status other than "Moored" or "At anchor" are removed.
+   * Duplicate entries for (MMSI, Latitude, Longitude) are deduplicated to reduce the dataset size.
+
+2. **Detection:**
+   * DBSCAN (Density-Based Spatial Clustering of Applications with Noise) is used to detect clusters of dense points in the filtered AIS data.
+   * The algorithm is configured with a distance threshold (`eps_km`) of 0.6 km and a minimum number of samples (`min_samples`) of 15.
+   * Clusters with fewer than 5 unique vessels are ignored (`min_vessels_per_port` parameter).
+
+3. **Sizing and Visualization:**
+   * Each detected port cluster is evaluated for its relative size based on the number of unique vessels that have been detected within that cluster.
+   * A convex hull is created around each cluster to visualize the port area.
+   * A visualization map is generated using Folium, showing the following:
+     - Detected port clusters with convex hulls.
+     - GPS pings of vessels within the port areas.
+     - Relative sizes of ports based on the number of unique vessels.
+     - Background heatmap of all filtered AIS points.
+
+## Project Structure
+
+* `data/`: Stores the input AIS CSV data.
+  * `input/`: Contains the AIS dataset files.
+  * `output/`: Stores the generated visualization map.
+* `python/`: Contains Python scripts for the analysis.
+  * `main.py`: The main script to run the analysis pipeline.
+  * `config.py`: Configuration class for loading parameters from `config.yml`.
+  * `data_loader.py`: Defines the schema and loads the AIS data.
+  * `filtering_operations.py`: Contains functions for data cleaning and filtering.
+  * `port_detection.py`: Implements the port detection and sizing logic using DBSCAN.
+  * `visualize_ports.py`: Generates map visualizations using Folium.
+* `config.yml`: Configuration file for input parameters and DBSCAN settings.
+* `Makefile`: Defines the build process and tasks for the project.
+* `pyproject.toml`: Defines the project dependencies and configuration for Poetry.
+* `README.md`: This file, providing an overview of the project.
+* `requirements.txt`: Lists Python package dependencies.
 
 ## Requirements
 
@@ -25,13 +57,13 @@ The script is designed to be configurable via a `config.yml` file for input para
    pip install -r requirements.txt
    ```
 
-3. Download and unzip the AIS dataset for 2024-05-04, e.g.:
+3. Download and unzip the AIS dataset for 2024-08-08, e.g.:
 
    ```
-   ais_2024-05-04.csv
+   ais_2024-08-08.csv
    ```
 
-4. Alter the `config.yml` file to point to the correct input file path. The default is set to `data/input/aisdk-2024-05-04.csv`.
+4. Alter the `config.yml` file to point to the correct input file path. The default is set to `data/input/aisdk-2024-08-08.csv`.
 
 ## Running the pipeline
 
@@ -39,105 +71,35 @@ The script is designed to be configurable via a `config.yml` file for input para
 python main.py
 ```
 
-It will output the MMSI and total kilometers traveled.
+This will start a Spark session, load the AIS data, filter it, detect ports, and visualize the results.
 
 Sample output:
 ```
 <timestamp> - INFO - Spark session started.
-<timestamp> - INFO - Data loaded from data/input/aisdk-2024-05-04.csv, total records: 19175663
-<timestamp> - INFO - Data types corrected and invalid coordinates filtered.
-<timestamp> - INFO - Identifying vessels with speeds over 200 m/s...
-<timestamp> - INFO - Found 277 vessels to ban due to excessive speed.
-<timestamp> - INFO - Original records: 19151391. Records after removing banned vessels: 18169459.
-<timestamp> - INFO - Distance segments calculated for valid vessels.
-<timestamp> - INFO - Top Vessels with longest routes (excluding speed-banned vessels):
-<timestamp> - INFO -   Rank 1: MMSI=219133000, Distance=793.69 km
-<timestamp> - INFO -   Rank 2: MMSI=230007000, Distance=739.58 km
-<timestamp> - INFO -   Rank 3: MMSI=636017000, Distance=719.01 km
-<timestamp> - INFO -   Rank 4: MMSI=308803000, Distance=709.98 km
-<timestamp> - INFO -   Rank 5: MMSI=244874000, Distance=685.00 km
-<timestamp> - INFO - Spark session stopped.
+<timestamp> - INFO - Successfully loaded data from data/input/aisdk-2024-08-08.csv
+<timestamp> - INFO - Initial row count: 20215048
+<timestamp> - INFO - Starting data filtering and preparation...
+<timestamp> - INFO - Rows after timestamp conversion and drop NA: 20215048
+<timestamp> - INFO - Rows after filtering invalid coordinates: 20106810
+<timestamp> - INFO - Rows after SOG filter (<= 2.5 knots): 8431099  
+<timestamp> - INFO - Rows after filtering by Navigational Status (Moored/At anchor): 586699
+<timestamp> - INFO - Rows after final selection and deduplication: 158298
+<timestamp> - INFO - Collecting filtered data for DBSCAN... (count: 158298)
+<timestamp> - INFO - Running DBSCAN with eps=0.6km (0.000094 radians) and min_samples=15
+<timestamp> - INFO - DBSCAN complete. Found 362 clusters and 881 noise points.
+<timestamp> - INFO - Skipped 314 clusters due to not meeting unique vessel threshold.
+<timestamp> - INFO - Detected 48 distinct port clusters using DBSCAN.
+<timestamp> - INFO - Evaluating relative port sizes...
+<timestamp> - INFO - Added relative size metrics. Total ports: 48
+<timestamp> - INFO - Collecting data for visualization...
+<timestamp> - INFO - Collecting all filtered points for heatmap background...
+<timestamp> - INFO - Generating visualization map: data/output/detected_ports_map.html
+<timestamp> - INFO - Map saved to data/output/detected_ports_map.html
 <timestamp> - INFO - Closing down clientserver connection
 ```
 
+The generated map will be saved to `data/output/detected_ports_map.html`.
+
 ## Findings
 
-Running on the AIS data for 2024-05-04 shows that the vessel **MMSI=219133000** traveled **793.69 km**, which is the longest route in that 24-hour period.
-
-
-
-
-
-
-
-
-
-
-
-# AIS Port Detection
-
-This project detects marine transportation ports from AIS (Automatic Identification System) data using PySpark.
-
-## Setup
-
-1.  **Install Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-2.  **Download AIS Data:**
-    * Go to [AIS Denmark](http://web.ais.dk/aisdata/).
-    * Download a CSV data file for any specific day.
-    * Unzip the file if necessary.
-    * Place the CSV file into the `data/` directory. For example, `data/ais_data_20230101.csv`.
-    * **Important:** Update the `AIS_DATA_FILE` variable in `main.py` to match your filename.
-
-## Running the Project
-
-Execute the main script:
-```bash
-python main.py
-```
-
-This will:
-1.  Initialize a Spark session.
-2.  Load and parse the AIS data.
-3.  Filter noise and prepare data.
-4.  Detect potential port areas using a grid-based density approach.
-5.  Estimate the relative size of these ports.
-6.  Generate an interactive HTML map named `detected_ports_map.html` in the project root, visualizing the ports.
-
-## Project Structure
-
-* `data/`: Stores the input AIS CSV data.
-* `main.py`: The main script to run the analysis pipeline.
-* `data_loader_and_schema.py`: Defines the schema and loads the AIS data.
-* `filtering_operations.py`: Contains functions for data cleaning and filtering.
-* `port_detection_logic.py`: Implements the port detection algorithm.
-* `port_sizing_logic.py`: Calculates the relative sizes of detected ports.
-* `visualize_ports.py`: Generates map visualizations using Folium.
-* `requirements.txt`: Lists Python package dependencies.
-
-## Port Detection Approach
-
-1.  **Filtering:**
-    * Vessels with Speed Over Ground (SOG) > 2.5 knots are filtered out.
-    * Vessels with specific "at port" like Navigational Statuses (e.g., "Moored", "At Anchor") are prioritized, or if status is not helpful, low speed is the primary indicator.
-    * Invalid coordinates are removed.
-
-2.  **Detection:**
-    * A grid-based density approach is used. Latitude and Longitude are discretized into grid cells.
-    * Cells with a high density of stationary/slow-moving vessel signals (and/or unique vessels) are identified as potential port areas.
-    * Adjacent dense cells are then grouped to form port clusters.
-
-3.  **Sizing:**
-    Relative port size is estimated based on:
-    * The number of unique vessels in the port area.
-    * The total number of AIS signals within the port area.
-    * The spatial extent (number of grid cells forming the port).
-
-## Customization
-
-* **Data File:** Change `AIS_DATA_FILE` in `main.py`.
-* **Filtering Parameters:** Adjust thresholds in `filtering_operations.py` (e.g., `SPEED_THRESHOLD`).
-* **Port Detection Parameters:** Modify grid cell size and density thresholds in `port_detection_logic.py`.
+Running on the AIS data for 2024-08-08 detected 48 distinct port clusters. The results were visualized on an interactive map, showing the detected ports, their relative sizes, locations of the GPS pings, and convex hulls around the port clusters.

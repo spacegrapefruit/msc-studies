@@ -1,8 +1,7 @@
 import logging
 from pyspark.sql.functions import col, to_timestamp
 
-# Define thresholds (can be tuned)
-SPEED_THRESHOLD_KNOTS = 2.5  # Vessels moving slower than this might be in port
+SPEED_THRESHOLD_KNOTS = 2.5  # slower vessels might be in port
 MIN_LATITUDE = -90.0
 MAX_LATITUDE = 90.0
 MIN_LONGITUDE = -180.0
@@ -11,15 +10,18 @@ TIMESTAMP_FORMAT = "dd/MM/yyyy HH:mm:ss"
 
 
 def filter_and_prepare_data(df):
+    """
+    Filter and prepare AIS data for port detection.
+    """
     logging.info("Starting data filtering and preparation...")
 
-    # Convert Timestamp string to TimestampType
+    # convert Timestamp
     df_ts = df.withColumn(
         "Timestamp", to_timestamp(col("Timestamp"), TIMESTAMP_FORMAT)
-    ).na.drop(subset=["Timestamp"])  # Drop rows where timestamp conversion failed
+    ).na.drop(subset=["Timestamp"])  # drop rows where timestamp conversion failed
     logging.info(f"Rows after timestamp conversion and drop NA: {df_ts.count()}")
 
-    # Filter by valid coordinates
+    # filter by valid coordinates
     df_valid_coords = df_ts.filter(
         (col("Latitude").isNotNull())
         & (col("Latitude") >= MIN_LATITUDE)
@@ -30,7 +32,7 @@ def filter_and_prepare_data(df):
     )
     logging.info(f"Rows after filtering invalid coordinates: {df_valid_coords.count()}")
 
-    # Filter by Speed Over Ground (SOG)
+    # filter by SOG
     df_slow_vessels = df_valid_coords.filter(col("SOG") <= SPEED_THRESHOLD_KNOTS)
     logging.info(
         f"Rows after SOG filter (<= {SPEED_THRESHOLD_KNOTS} knots): {df_slow_vessels.count()}"
@@ -47,13 +49,8 @@ def filter_and_prepare_data(df):
 
     # select necessary columns
     final_df = df_slow_stationary_vessels.select(
-        "MMSI",
-        "Latitude",
-        "Longitude",
-        "SOG",
-        "Timestamp",
-        "NavigationalStatus",
-    )
+        "MMSI", "Latitude", "Longitude"
+    ).dropDuplicates()
 
-    logging.info(f"Filtered data ready for port detection: {final_df.count()} rows.")
+    logging.info(f"Rows after final selection and deduplication: {final_df.count()}")
     return final_df

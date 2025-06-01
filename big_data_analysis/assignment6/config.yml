@@ -1,4 +1,7 @@
 main:
-  input_file: "data/input/aisdk-2024-08-08.min.csv"
+  input_file: "data/input/aisdk-2024-08-08.csv"
   viz_output_file: "data/output/detected_ports_map.html"
-  max_points_for_heatmap: 200000  # maximum number of points to plot on the heatmap
+  dbscan:
+    eps_km: 0.6
+    min_samples: 15
+    min_vessels_per_port: 5
