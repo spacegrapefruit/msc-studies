@@ -1,5 +1,3 @@
-[  95%] 05-28 - Deep Learning Group project (20%)
-[  75%] 05-31 - Big Data Analysis Group project (20%)
 [   5%] 06-19 - Big Data Analysis Individual project (20%)
 
 [exam!] 06-09 - Functional Data Analysis exam (50%)
