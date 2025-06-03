@@ -21,7 +21,7 @@ This project detects marine transportation ports from AIS (Automatic Identificat
    * A convex hull is created around each cluster to visualize the port area.
    * A visualization map is generated using Folium, showing the following:
      - Detected port clusters with convex hulls.
-     - GPS pings of vessels within the port areas.
+     - AIS pings of vessels within the port areas.
      - Relative sizes of ports based on the number of unique vessels.
      - Background heatmap of all filtered AIS points.
 
@@ -104,4 +104,4 @@ The generated map will be saved to `data/output/detected_ports_map.html`.
 
 ## Findings
 
-Running on the AIS data for 2024-08-08 detected 48 distinct port clusters. The results were visualized on an interactive map, showing the detected ports, their relative sizes, locations of the GPS pings, and convex hulls around the port clusters.
+Running on the AIS data for 2024-08-08 detected 48 distinct port clusters. The results were visualized on an interactive map, showing the detected ports, their relative sizes, locations of the AIS pings, and convex hulls around the port clusters.
