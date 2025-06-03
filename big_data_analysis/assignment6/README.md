@@ -67,8 +67,10 @@ This project detects marine transportation ports from AIS (Automatic Identificat
 
 ## Running the pipeline
 
+To run the AIS port detection pipeline, execute the following command in the terminal:
+
 ```bash
-python main.py
+[poetry run] python main.py
 ```
 
 This will start a Spark session, load the AIS data, filter it, detect ports, and visualize the results.
