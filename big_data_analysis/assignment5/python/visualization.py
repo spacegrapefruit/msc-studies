@@ -17,7 +17,7 @@ def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(16, 9))
 
-    # Plot each topic's trend line
+    # plot each topic's trend line
     for column in trends_df.columns:
         if column.startswith("topic_"):
             # TODO fix smoothing
@@ -32,7 +32,7 @@ def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
                 label=column.replace("_", " ").title(),
             )
 
-    # Formatting the plot
+    # formatting the plot
     ax.set_title("Topic Popularity Over Time on Medium", fontsize=20, pad=20)
     ax.set_xlabel("Date", fontsize=14)
     ax.set_ylabel("Average Topic Prevalence", fontsize=14)
@@ -40,8 +40,8 @@ def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
     plt.xticks(rotation=45)
     plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make space for legend
 
-    # Save the figure
-    fig.savefig(output_path, dpi=300)
+    # save the figure
+    fig.savefig(output_path)
     logging.info("Trends plot saved successfully.")
     plt.close(fig)
 
@@ -58,7 +58,7 @@ def plot_topic_wordclouds(
     vocabulary = cv_model.vocabulary
 
     for i, topic in enumerate(topics.collect()):
-        # Create a dictionary of word: weight for the word cloud
+        # create a dictionary of word: weight for the word cloud
         term_indices = topic["termIndices"]
         term_weights = topic["termWeights"]
         word_weights_dict = {
@@ -74,7 +74,7 @@ def plot_topic_wordclouds(
         plt.title(f"Topic {i}", fontsize=20)
         plt.axis("off")
 
-        # Save the figure
+        # save the figure
         output_path = output_dir / f"topic_{i}.png"
         plt.savefig(output_path)
         plt.close()

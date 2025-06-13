@@ -46,8 +46,8 @@ if __name__ == "__main__":
             num_topics=config.num_topics,
         )
 
-        # describe, print the topics
-        describe_topics(lda_model, cv_model)
+        # print the topics
+        describe_topics(lda_model, cv_model, num_top_words=5)
 
         # analyze topic trends
         trends_df = analyze_topic_trends(df_with_topics, num_topics=config.num_topics)
