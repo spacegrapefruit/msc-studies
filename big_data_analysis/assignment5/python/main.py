@@ -4,7 +4,12 @@ from pyspark.sql import SparkSession
 
 from config import Config
 from data_loader import load_preprocess_data
-from topic_modeling_trends import analyze_topic_trends, describe_topics, train_lda_model
+from topic_modeling_trends import (
+    analyze_topic_trends,
+    describe_topics,
+    get_topic_keywords,
+    train_lda_model,
+)
 from visualization import plot_topic_trends, plot_topic_wordclouds
 
 
@@ -50,10 +55,11 @@ if __name__ == "__main__":
         describe_topics(lda_model, cv_model, num_top_words=5)
 
         # analyze topic trends
+        topic_keywords = get_topic_keywords(lda_model, cv_model, num_top_words=3)
         trends_df = analyze_topic_trends(df_with_topics, num_topics=config.num_topics)
 
         # visualize trends and word clouds
-        plot_topic_trends(trends_df, output_plot_path)
+        plot_topic_trends(trends_df, topic_keywords, output_plot_path)
         plot_topic_wordclouds(lda_model, cv_model, output_wordcloud_dir)
         logging.info("Topic trends analysis completed successfully.")
 

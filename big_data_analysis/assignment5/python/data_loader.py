@@ -40,6 +40,14 @@ def load_preprocess_data(
         .withColumn("date", to_timestamp(col("timestamp")))
     )
 
+    # remove rows outside 2015-2022 range
+    df_clean = df_clean.filter(
+        (col("date") >= "2015-01-01") & (col("date") <= "2022-12-31")
+    )
+    logging.info(
+        f"Filtered dataset to {df_clean.count()} articles within the date range 2015-2022."
+    )
+
     # convert to lowercase and remove non-alphabetic characters
     df_clean = df_clean.withColumn(
         "text_clean",

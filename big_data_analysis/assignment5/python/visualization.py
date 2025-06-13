@@ -8,7 +8,9 @@ from pyspark.ml.feature import CountVectorizerModel
 from wordcloud import WordCloud
 
 
-def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
+def plot_topic_trends(
+    trends_df: pd.DataFrame, topic_keywords: list[str], output_path: Path
+) -> None:
     """
     Plots the topic prevalence over time and saves it as a PNG file.
     """
@@ -18,7 +20,7 @@ def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
     fig, ax = plt.subplots(figsize=(16, 9))
 
     # plot each topic's trend line
-    for column in trends_df.columns:
+    for column, keywords in zip(trends_df.columns, topic_keywords):
         if column.startswith("topic_"):
             # TODO fix smoothing
             # smooth the trend line using a rolling mean
@@ -29,14 +31,19 @@ def plot_topic_trends(trends_df: pd.DataFrame, output_path: Path) -> None:
             ax.plot(
                 trends_df.index,
                 trends_df[column],
-                label=column.replace("_", " ").title(),
+                label=f"Topic {idx}: {keywords}",
             )
 
     # formatting the plot
     ax.set_title("Topic Popularity Over Time on Medium", fontsize=20, pad=20)
     ax.set_xlabel("Date", fontsize=14)
     ax.set_ylabel("Average Topic Prevalence", fontsize=14)
-    ax.legend(title="Topics", bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.legend(
+        title="Topics & Keywords",
+        bbox_to_anchor=(1.02, 1),
+        loc="upper left",
+        fontsize="small",
+    )
     plt.xticks(rotation=45)
     plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make space for legend
 

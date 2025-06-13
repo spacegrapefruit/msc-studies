@@ -50,6 +50,25 @@ def describe_topics(
         logging.info("-" * 25)
 
 
+def get_topic_keywords(
+    lda_model: LDAModel, cv_model: CountVectorizerModel, num_top_words: int = 3
+) -> list[str]:
+    """
+    Returns a list of top keywords for each topic.
+    """
+    topics = lda_model.describeTopics(maxTermsPerTopic=num_top_words)
+    vocabulary = cv_model.vocabulary
+
+    topic_keywords = []
+    for topic in topics.collect():
+        topic_index = topic["topic"]
+        word_indices = topic["termIndices"]
+        topic_words = [vocabulary[idx] for idx in word_indices]
+        topic_keywords.append(", ".join(topic_words))
+
+    return topic_keywords
+
+
 def analyze_topic_trends(df_with_topics, num_topics):
     """
     Aggregates topic prevalence over time (monthly).
