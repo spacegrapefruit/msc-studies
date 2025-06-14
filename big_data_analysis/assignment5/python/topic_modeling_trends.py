@@ -29,42 +29,36 @@ def train_lda_model(
     return lda_model, df_with_topics
 
 
-def describe_topics(
-    lda_model: LDAModel, cv_model: CountVectorizerModel, num_top_words: int = 10
-) -> None:
-    """
-    Prints the top words for each topic discovered by the LDA model.
-    """
-    logging.info("\n--- Discovered Topics ---")
-    topics = lda_model.describeTopics(maxTermsPerTopic=num_top_words)
-    vocabulary = cv_model.vocabulary
-
-    for i, topic in enumerate(topics.collect()):
-        logging.info(f"Topic {i}:")
-        word_indices = topic["termIndices"]
-        word_weights = topic["termWeights"]
-        topic_words = [vocabulary[idx] for idx in word_indices]
-
-        for word, weight in zip(topic_words, word_weights):
-            logging.info(f"  - {word} (weight: {weight:.4f})")
-        logging.info("-" * 25)
-
-
 def get_topic_keywords(
-    lda_model: LDAModel, cv_model: CountVectorizerModel, num_top_words: int = 3
+    lda_model: LDAModel,
+    cv_model: CountVectorizerModel,
+    num_top_words: int = 3,
+    verbose: bool = False,
 ) -> list[str]:
     """
-    Returns a list of top keywords for each topic.
+    Returns a list of top keywords for each topic. If verbose is True, prints the keywords.
     """
     topics = lda_model.describeTopics(maxTermsPerTopic=num_top_words)
     vocabulary = cv_model.vocabulary
 
+    if verbose:
+        logging.info("\n--- Discovered Topics ---")
+
     topic_keywords = []
-    for topic in topics.collect():
-        topic_index = topic["topic"]
+    for i, topic in enumerate(topics.collect()):
         word_indices = topic["termIndices"]
         topic_words = [vocabulary[idx] for idx in word_indices]
         topic_keywords.append(", ".join(topic_words))
+
+        if verbose:
+            logging.info(f"Topic {i}:")
+            word_weights = topic["termWeights"]
+
+            for word, weight in zip(topic_words, word_weights):
+                logging.info(f"  - {word} (weight: {weight:.4f})")
+
+    if verbose:
+        logging.info("-" * 25)
 
     return topic_keywords
 
@@ -79,11 +73,15 @@ def analyze_topic_trends(df_with_topics, num_topics):
     def get_topic_weight(topic_index):
         return udf(lambda v: float(v[topic_index]), DoubleType())
 
-    # create a column for each topic's weight
+    select_exprs = [col("*")]  # keep all existing columns
     for i in range(num_topics):
-        df_with_topics = df_with_topics.withColumn(
-            f"topic_{i}_weight", get_topic_weight(i)(col("topicDistribution"))
+        select_exprs.append(
+            get_topic_weight(i)(col("topicDistribution")).alias(f"topic_{i}_weight")
         )
+
+    # apply all transformations in a single select statement
+    df_with_topics = df_with_topics.select(select_exprs)
+    logging.info("Extracted topic weights from topic distribution.")
 
     # aggregate by year and month
     df_trends = df_with_topics.withColumn("year", year(col("date"))).withColumn(

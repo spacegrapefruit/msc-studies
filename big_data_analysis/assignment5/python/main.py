@@ -6,7 +6,6 @@ from config import Config
 from data_loader import load_preprocess_data
 from topic_modeling_trends import (
     analyze_topic_trends,
-    describe_topics,
     get_topic_keywords,
     train_lda_model,
 )
@@ -52,11 +51,15 @@ if __name__ == "__main__":
             max_iter=40,
         )
 
-        # print the topics
-        describe_topics(lda_model, cv_model, num_top_words=5)
+        # get topic keywords, print them
+        topic_keywords = get_topic_keywords(
+            lda_model,
+            cv_model,
+            num_top_words=4,
+            verbose=True,
+        )
 
         # analyze topic trends
-        topic_keywords = get_topic_keywords(lda_model, cv_model, num_top_words=4)
         trends_df = analyze_topic_trends(df_with_topics, num_topics=config.num_topics)
 
         # visualize trends and word clouds
