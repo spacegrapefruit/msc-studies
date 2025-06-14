@@ -109,7 +109,7 @@ The generated visualizations will be saved in the `data/output/` directory:
 
 Running on the dataset of Medium articles, the LDA model identified several topics, each represented by a set of top words. The trends over time showed how the popularity of these topics evolved, with some topics gaining traction while others declined.
 
-For instance, Topic 10 ("blockchain", "bitcoin", "crypto") had a prominent peak in 2018. Topic 0 ("file", "server", "cloud") showed a slow but steady increase in popularity over the years.
+For instance, **Topic 10** (`blockchain`, `bitcoin`, `crypto`) had a prominent peak in 2018. **Topic 0** (`file`, `server`, `cloud`) showed a slow but steady increase in popularity over the years.
 
 ![Topic Trends](data/output/topic_trends.png)
 
