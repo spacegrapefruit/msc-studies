@@ -40,12 +40,12 @@ def load_preprocess_data(
         .withColumn("date", to_timestamp(col("timestamp")))
     )
 
-    # remove rows outside 2015-2022 range
+    # remove rows outside 2016-2022 range
     df_clean = df_clean.filter(
-        (col("date") >= "2015-01-01") & (col("date") <= "2022-12-31")
+        (col("date") >= "2016-01-01") & (col("date") <= "2022-12-31")
     )
     logging.info(
-        f"Filtered dataset to {df_clean.count()} articles within the date range 2015-2022."
+        f"Filtered dataset to {df_clean.count()} articles within the date range 2016-2022."
     )
 
     # convert to lowercase and remove non-alphabetic characters
@@ -74,8 +74,8 @@ def load_preprocess_data(
     cv = CountVectorizer(
         inputCol="filtered_words",
         outputCol="raw_features",
-        vocabSize=5000,
-        minDF=5,
+        vocabSize=15000,
+        minDF=10,
     )
 
     # IDF to scale down the importance of common words

@@ -1,4 +1,4 @@
 input_path: "data/input/medium_articles.csv"
 output_plot_path: "data/output/topic_trends.png"
 output_wordcloud_dir: "data/output/wordclouds"
-num_topics: 10
+num_topics: 12

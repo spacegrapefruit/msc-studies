@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # initialize Spark
     spark = (
         SparkSession.builder.appName("MediumTopicTrends")
-        .config("spark.driver.memory", "8g")  # give it 8GB of memory
+        .config("spark.driver.memory", "16g")  # give it 16GB of memory
         .master("local[*]")  # use all available cores
         .getOrCreate()
     )
@@ -49,13 +49,14 @@ if __name__ == "__main__":
         lda_model, df_with_topics = train_lda_model(
             processed_data,
             num_topics=config.num_topics,
+            max_iter=40,
         )
 
         # print the topics
         describe_topics(lda_model, cv_model, num_top_words=5)
 
         # analyze topic trends
-        topic_keywords = get_topic_keywords(lda_model, cv_model, num_top_words=3)
+        topic_keywords = get_topic_keywords(lda_model, cv_model, num_top_words=4)
         trends_df = analyze_topic_trends(df_with_topics, num_topics=config.num_topics)
 
         # visualize trends and word clouds

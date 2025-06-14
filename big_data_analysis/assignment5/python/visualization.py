@@ -1,10 +1,12 @@
 import logging
 from pathlib import Path
 
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import pandas as pd
 from pyspark.ml.clustering import LDAModel
 from pyspark.ml.feature import CountVectorizerModel
+from scipy.ndimage import gaussian_filter
 from wordcloud import WordCloud
 
 
@@ -18,32 +20,29 @@ def plot_topic_trends(
 
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(16, 9))
+    colors = plt.get_cmap("tab20").colors
 
     # plot each topic's trend line
-    for column, keywords in zip(trends_df.columns, topic_keywords):
+    plot_columns = [col for col in trends_df.columns if col.startswith("topic_")]
+    for idx, (column, keywords) in enumerate(zip(plot_columns, topic_keywords)):
         if column.startswith("topic_"):
-            # TODO fix smoothing
-            # smooth the trend line using a rolling mean
-            trends_df[column] = (
-                trends_df[column].rolling(window=5, min_periods=1).mean()
-            )
+            # smooth the trend line
+            trends_df[column] = gaussian_filter(trends_df[column], 2)
+
             # plot the trend line
             ax.plot(
                 trends_df.index,
                 trends_df[column],
                 label=f"Topic {idx}: {keywords}",
+                color=colors[idx],
             )
 
     # formatting the plot
     ax.set_title("Topic Popularity Over Time on Medium", fontsize=20, pad=20)
     ax.set_xlabel("Date", fontsize=14)
     ax.set_ylabel("Average Topic Prevalence", fontsize=14)
-    ax.legend(
-        title="Topics & Keywords",
-        bbox_to_anchor=(1.02, 1),
-        loc="upper left",
-        fontsize="small",
-    )
+    ax.legend(title="Topics & Keywords", bbox_to_anchor=(1.02, 1), loc="upper left")
+    plt.ylim(-0.005, 0.255)
     plt.xticks(rotation=45)
     plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make space for legend
 
